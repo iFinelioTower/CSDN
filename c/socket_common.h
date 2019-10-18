@@ -10,28 +10,49 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
+#include <stdlib.h>
 
-#define SERVER_PORT 8888
+#include <time.h>
+#include <sys/queue.h>
+
+#include "utils.h"
+
+#define MODULE_NAME "Socket: "
+#define DEBUG(fmt, args...) printf(MODULE_NAME fmt, ##args);
+
 #define BACKLOG     10
+#define SERVER_PORT 8888
+#define CLIENT_DEFAULT_IP "127.0.0.1"
+#define BUFFER_MAX  1024
 
-#define N_SUFFIX(x, len) \
-    x[len] = '\n'
-
-struct SocketServer {
-   	int iSocket_fd;
-	struct sockaddr_in tSocketAddr_in;
+struct SocketCommon {
+   	int fd;
+	int max_fd;
+	fd_set fd_list;
+	
+	struct sockaddr_in tSocketAddr_in;	
 };
 
 struct SocketClient {
-	
+	char *ip;
+	char *name;
+
+	int message_len;
+	struct SocketCommon desc;
+	SLIST_ENTRY(entry) entries;
 };
 
-typedef enum {
-	TPYE_IP = 0,
-	TPYE_NAME = 1,
-	TPYE_MESSAGE = 2,
-}SocketType;	
-int incode(const char *msg);
-int encode(SocketType type, const char *msg);
+struct SocketServer {
+	struct SocketCommon desc;
+};
+
+struct entry {
+	int fd;
+	char *ip;
+	char *name;
+	
+	SLIST_ENTRY(entry) entries;     /* Singly-linked List. */
+ };
+
 
 #endif /* __SOCKET_SIMPLE_H__ */
