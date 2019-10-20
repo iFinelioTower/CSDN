@@ -6,7 +6,7 @@
 #endif
 
 #define Tips(x, y) \
-	DEBUG("Usage default config, ip: %s, name: user_%s\n", x, y)
+	DEBUG("Usage default config, ip: %s, name: %s\n", x, y)
 
 void online(struct SocketClient *Socket) {
 	send(Socket->desc.fd, Socket->name, strlen(Socket->name), 0);
@@ -49,7 +49,7 @@ int loop_client(struct SocketClient *Socket)
 		
 		select(Socket->desc.fd + 1, &Socket->desc.fd_list, NULL, NULL, &tv);  
         if (LISTENER_INQUIRE(STDIN_FILENO, Socket->desc.fd_list)) {  
-            int len = getMessage(ucSendBuf, BUFFER_MAX - 1);
+            int len = waitInputMessage(ucSendBuf, BUFFER_MAX - 1);
 			if (len > 0) {
 				int start = send(Socket->desc.fd, ucSendBuf, len, 0);
 				if (start <= 0) {
@@ -59,17 +59,18 @@ int loop_client(struct SocketClient *Socket)
 			}
         }
 		
-        if (LISTENER_INQUIRE(Socket->desc.fd, Socket->desc.fd_list)) {  
-     		bzero(ucRecvBuf, message_len);
-			int recvlen = recv(Socket->desc.fd, ucRecvBuf, BUFFER_MAX - 1, 0);
-			if (recvlen > 0) {
-				DEBUG("recv: %s\n", ucRecvBuf);
-				message_len = recvlen;
-			} else {
-				printf("服务器端退出!\n");
+		if (LISTENER_INQUIRE(Socket->desc.fd, Socket->desc.fd_list)) {
+			 bzero(ucRecvBuf, BUFFER_MAX);
+			 int recvlen = recv(Socket->desc.fd, ucRecvBuf, BUFFER_MAX - 1, 0);
+		     if (recvlen > 0) {
+				DEBUG("%s\n", ucRecvBuf);
+			 } else if (recvlen < 0) {
+				DEBUG("recv error!\n");
+			 } else {
+			    DEBUG("Server offline, Abort!\n");
 				exit(0);
-			}
-        }
+			 }
+		}
 	}
 	
 	return 0;

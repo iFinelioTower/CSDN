@@ -13,7 +13,7 @@
 #define LISTENER_INQUIRE(fd, list) FD_ISSET(fd, &list)
 #define LISTENER_DEL(fd, list) FD_CLR(fd, &list)
 
-int getMessage(char *buf, int size);
+int waitInputMessage(char *buf, int size);
 
 #endif /* __SOCKET_UTILS_H__ */
 
