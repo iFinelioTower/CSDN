@@ -1,0 +1,10 @@
+-keep class com.android.systemui2.statusbar.policy.KeyButtonView {
+  public float getDrawingAlpha();
+  public float getGlowAlpha();
+  public float getGlowScale();
+  public void setDrawingAlpha(float);
+  public void setGlowAlpha(float);
+  public void setGlowScale(float);
+}
+
+-keep class com.android.systemui2.statusbar.tv.TvStatusBar

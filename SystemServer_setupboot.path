@@ -1,0 +1,86 @@
+diff --git a/services/java/com/android/server/SystemServer.java b/services/java/com/android/server/SystemServer.java
+old mode 100644
+new mode 100755
+index 948d335..27f6822
+--- a/services/java/com/android/server/SystemServer.java
++++ b/services/java/com/android/server/SystemServer.java
+@@ -91,6 +91,7 @@ import com.android.server.usb.UsbService;
+ import com.android.server.wallpaper.WallpaperManagerService;
+ import com.android.server.webkit.WebViewUpdateService;
+ import com.android.server.wm.WindowManagerService;
++import com.android.server.statusbar.SystemUI2BarManagerService;
+ 
+ import dalvik.system.VMRuntime;
+ 
+@@ -436,6 +437,7 @@ public final class SystemServer {
+         boolean disableBluetooth = SystemProperties.getBoolean("config.disable_bluetooth", false);
+         boolean disableLocation = SystemProperties.getBoolean("config.disable_location", false);
+         boolean disableSystemUI = SystemProperties.getBoolean("config.disable_systemui", false);
++		boolean disableSystemUI2 = SystemProperties.getBoolean("config.disable_systemui2", false);
+         boolean disableNonCoreServices = SystemProperties.getBoolean("config.disable_noncore", false);
+         boolean disableNetwork = SystemProperties.getBoolean("config.disable_network", false);
+         boolean disableNetworkTime = SystemProperties.getBoolean("config.disable_networktime", false);
+@@ -535,6 +537,7 @@ public final class SystemServer {
+         }
+ 
+         StatusBarManagerService statusBar = null;
++		SystemUI2BarManagerService systemui2StatusBar = null;
+         INotificationManager notification = null;
+         InputMethodManagerService imm = null;
+         WallpaperManagerService wallpaper = null;
+@@ -636,6 +639,16 @@ public final class SystemServer {
+                 }
+             }
+ 
++			if (!disableSystemUI2) {
++                try {
++                    Slog.i(TAG, "SystemUI2 Bar");
++                    systemui2StatusBar = new SystemUI2BarManagerService(context, wm);
++                    ServiceManager.addService(Context.SYSTEMUI2_BAR_SERVICE, systemui2StatusBar);
++                } catch (Throwable e) {
++                    reportWtf("starting SystemUI2BarManagerService", e);
++                }
++            }
++			
+             if (!disableNonCoreServices) {
+                 try {
+                     Slog.i(TAG, "Clipboard Service");
+@@ -1137,6 +1150,13 @@ public final class SystemServer {
+                 } catch (Throwable e) {
+                     reportWtf("starting System UI", e);
+                 }
++
++				try {
++                    startSystemUi2(context);
++                } catch (Throwable e) {
++                    reportWtf("starting System UI2", e);
++                }
++				
+                 try {
+                     if (networkScoreF != null) networkScoreF.systemReady();
+                 } catch (Throwable e) {
+@@ -1242,7 +1262,7 @@ public final class SystemServer {
+             }
+         });
+     }
+-
++	
+     static final void startSystemUi(Context context) {
+         Intent intent = new Intent();
+         intent.setComponent(new ComponentName("com.android.systemui",
+@@ -1250,4 +1270,15 @@ public final class SystemServer {
+         //Slog.d(TAG, "Starting service: " + intent);
+         context.startServiceAsUser(intent, UserHandle.OWNER);
+     }
++	
++	static final void startSystemUi2(Context context) {
++        Intent intent = new Intent();
++        intent.setComponent(new ComponentName("com.android.systemui2",
++                    "com.android.systemui2.SystemUIService"));
++		
++		if (context.startServiceAsUser(intent, UserHandle.OWNER) == null)
++			SystemProperties.set("persist.systemui2.ready", "0");
++		else
++			SystemProperties.set("persist.systemui2.ready", "1");
++    }
+ }

@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">systemui2</string>
+    <string name="app_label">systemui2</string>
+    <string name="batterylow_notifiy">"电量低,\n请连接充电器"</string>
+	<string name="volumefonts">"音量"</string>
+</resources>
