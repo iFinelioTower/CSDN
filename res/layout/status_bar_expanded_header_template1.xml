@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+** Copyright 2012, The Android Open Source Project
+**
+** Licensed under the Apache License, Version 2.0 (the "License"); 
+** you may not use this file except in compliance with the License. 
+** You may obtain a copy of the License at 
+**
+**     http://www.apache.org/licenses/LICENSE-2.0 
+**
+** Unless required by applicable law or agreed to in writing, software 
+** distributed under the License is distributed on an "AS IS" BASIS, 
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+** See the License for the specific language governing permissions and 
+** limitations under the License.
+-->
+
+<!-- Extends RelativeLayout -->
+<com.android.systemui.statusbar.phone.StatusBarHeaderView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:systemui="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/header"
+    android:layout_width="@dimen/notification_panel_width"
+    android:layout_height="@dimen/status_bar_header_height"
+    android:layout_gravity="@integer/notification_panel_layout_gravity"
+    android:paddingStart="@dimen/notification_side_padding"
+    android:paddingEnd="@dimen/notification_side_padding"
+    android:baselineAligned="false"
+    android:elevation="4dp"
+    android:background="@mipmap/ic_notification_header_bg"
+    android:clickable="true"
+    android:focusable="true"
+    android:orientation="vertical"
+    >
+    
+    <LinearLayout
+        xmlns:CombinationITButtonAttr="http://schemas.android.com/apk/res-auto"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:layout_marginRight="20dp"
+        android:layout_marginLeft="20dp"
+        android:orientation="horizontal">
+        
+        <com.android.systemui.statusbar.widget.CombinationITButton
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            CombinationITButtonAttr:imageSrc="@mipmap/ic_notification_wifi"
+            CombinationITButtonAttr:textDesc="@string/statusbar_icon_wifi"
+            CombinationITButtonAttr:colorEnable="@color/color_statusbar_icon_blue"
+            CombinationITButtonAttr:colorDisable="@color/color_statusbar_icon_gray"
+            android:id="@+id/icon_wifi"
+            /> 
+        
+        <com.android.systemui.statusbar.widget.CombinationITButton
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            CombinationITButtonAttr:imageSrc="@mipmap/ic_notification_ble"
+            CombinationITButtonAttr:textDesc="@string/statusbar_icon_ble"
+            CombinationITButtonAttr:colorEnable="@color/color_statusbar_icon_blue"
+            CombinationITButtonAttr:colorDisable="@color/color_statusbar_icon_gray"
+            android:id="@+id/icon_ble"
+            /> 
+            
+        <com.android.systemui.statusbar.widget.CombinationITButton
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            CombinationITButtonAttr:imageSrc="@mipmap/ic_notification_air"
+            CombinationITButtonAttr:textDesc="@string/statusbar_icon_air"
+            CombinationITButtonAttr:colorEnable="@color/color_statusbar_icon_yellow"
+            CombinationITButtonAttr:colorDisable="@color/color_statusbar_icon_gray"
+            android:id="@+id/icon_air"
+            /> 
+            
+        <com.android.systemui.statusbar.widget.CombinationITButton
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            CombinationITButtonAttr:imageSrc="@mipmap/ic_notification_setting"
+            CombinationITButtonAttr:textDesc="@string/statusbar_icon_setting"
+            CombinationITButtonAttr:colorEnable="@color/color_statusbar_icon_gray"
+            CombinationITButtonAttr:colorDisable="@color/color_statusbar_icon_gray"
+            android:id="@+id/icon_settings"
+            /> 
+    </LinearLayout>
+    
+    <include layout="@layout/combination_itseekbar" 
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:layout_marginRight="20dp"
+        android:layout_marginLeft="20dp"/>
+        
+    <include layout="@layout/signal_cluster_view"
+        android:id="@+id/signal_cluster"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="2.5dp"/>
+    
+</com.android.systemui.statusbar.phone.StatusBarHeaderView>

@@ -1,0 +1,1412 @@
+diff --git a/packages/SystemUI/Android.mk b/packages/SystemUI/Android.mk
+index 51fea2a..f213929 100644
+--- a/packages/SystemUI/Android.mk
++++ b/packages/SystemUI/Android.mk
+@@ -29,6 +29,6 @@ include frameworks/base/packages/SettingsLib/common.mk
+ 
+ include $(BUILD_PACKAGE)
+ 
+-ifeq ($(EXCLUDE_SYSTEMUI_TESTS),)
+-    include $(call all-makefiles-under,$(LOCAL_PATH))
+-endif
++#ifeq ($(EXCLUDE_SYSTEMUI_TESTS),)
++#    include $(call all-makefiles-under,$(LOCAL_PATH))
++#endif
+diff --git a/packages/SystemUI/res/layout/status_bar_expanded.xml b/packages/SystemUI/res/layout/status_bar_expanded.xml
+old mode 100644
+new mode 100755
+index f7bbce0..7acee07
+--- a/packages/SystemUI/res/layout/status_bar_expanded.xml
++++ b/packages/SystemUI/res/layout/status_bar_expanded.xml
+@@ -98,7 +98,8 @@
+             layout="@layout/keyguard_bottom_area"
+             android:visibility="gone" />
+ 
+-    <include layout="@layout/status_bar_expanded_header" />
++    <!-- <include layout="@layout/status_bar_expanded_header" /> -->
++    <include layout="@layout/status_bar_expanded_header_template1" />
+ 
+     <com.android.systemui.statusbar.AlphaOptimizedView
+         android:id="@+id/qs_navbar_scrim"
+diff --git a/packages/SystemUI/res/values/attrs.xml b/packages/SystemUI/res/values/attrs.xml
+old mode 100644
+new mode 100755
+index 49f7bdb..551c7d8
+--- a/packages/SystemUI/res/values/attrs.xml
++++ b/packages/SystemUI/res/values/attrs.xml
+@@ -91,5 +91,30 @@
+     <declare-styleable name="AlphaOptimizedImageView">
+         <attr name="hasOverlappingRendering" format="boolean" />
+     </declare-styleable>
++    
++    <declare-styleable name="CombinationITButton">
++        <attr name="imageSrc" format="reference"/>
++        <attr name="textDesc" format="string"/>
++        <attr name="colorEnable" format="color"/>
++        <attr name="colorDisable" format="color"/>
++    </declare-styleable>
++    
++    <declare-styleable name="RippleView">
++        <attr name="rv_alpha" format="integer" />
++        <attr name="rv_framerate" format="integer"/>
++        <attr name="rv_rippleDuration" format="integer"/>
++        <attr name="rv_zoomDuration" format="integer" />
++        <attr name="rv_color" format="color" />
++        <attr name="rv_centered" format="boolean" />
++        <attr name="rv_type" format="enum">
++            <enum name="simpleRipple" value="0"/>
++            <enum name="doubleRipple" value="1"/>
++            <enum name="rectangle" value="2" />
++        </attr>
++        <attr name="rv_ripplePadding" format="dimension" />
++        <attr name="rv_zoom" format="boolean" />
++        <attr name="rv_zoomScale" format="float" />
++    </declare-styleable>
++    
+ </resources>
+ 
+diff --git a/packages/SystemUI/res/values/colors.xml b/packages/SystemUI/res/values/colors.xml
+old mode 100644
+new mode 100755
+index f523376..637f1d8
+--- a/packages/SystemUI/res/values/colors.xml
++++ b/packages/SystemUI/res/values/colors.xml
+@@ -33,6 +33,7 @@
+     <color name="batterymeter_frame_color">#4DFFFFFF</color><!-- 30% white -->
+     <color name="batterymeter_charge_color">#FFFFFFFF</color>
+     <color name="batterymeter_bolt_color">#FFFFFFFF</color>
++       
+     <color name="qs_batterymeter_frame_color">#FF404040</color>
+     <color name="system_primary_color">#ff263238</color><!-- blue grey 900 -->
+     <color name="system_secondary_color">#ff384248</color>
+@@ -145,4 +146,14 @@
+     <color name="volume_icon_color">#ffffffff</color>
+     <color name="volume_settings_icon_color">#7fffffff</color>
+     <color name="volume_slider_inactive">#FFB0BEC5</color><!-- blue grey 200 -->
++    
++    <!-- sunchip -->
++    <color name="color_statusbar_icon_yellow">#FFFFC107</color>
++    <color name="color_statusbar_icon_white">#FFFFFFFF</color>
++    <color name="color_statusbar_icon_blue">#FF007aff</color>
++    <color name="color_statusbar_icon_gray">#FF8f8f93</color>
++    <color name="color_statusbar_icon_blank">#FF000000</color>
++    <color name="color_statusbar_text">#353F3D</color>
++    <!-- sunchip -->
++    
+ </resources>
+diff --git a/packages/SystemUI/res/values/dimens.xml b/packages/SystemUI/res/values/dimens.xml
+old mode 100644
+new mode 100755
+index 48df2ce..d4c5298
+--- a/packages/SystemUI/res/values/dimens.xml
++++ b/packages/SystemUI/res/values/dimens.xml
+@@ -131,10 +131,10 @@
+     <dimen name="close_handle_underlap">32dp</dimen>
+ 
+     <!-- Height of the status bar header bar -->
+-    <dimen name="status_bar_header_height">60dp</dimen>
++    <dimen name="status_bar_header_height">135dp</dimen>
+ 
+     <!-- Height of the status bar header bar when expanded -->
+-    <dimen name="status_bar_header_height_expanded">116dp</dimen>
++    <dimen name="status_bar_header_height_expanded">135dp</dimen>
+ 
+     <!-- Height of the status bar header bar when on Keyguard -->
+     <dimen name="status_bar_header_height_keyguard">40dp</dimen>
+@@ -590,4 +590,9 @@
+ 
+     <!-- Thickness of the shadows of the assist disclosure beams -->
+     <dimen name="assist_disclosure_shadow_thickness">1.5dp</dimen>
++    
++    <!-- sunchip -->
++    <dimen name="text_icon_margin">5dp</dimen>
++    <!-- sunchip -->
++    
+ </resources>
+diff --git a/packages/SystemUI/res/values/strings.xml b/packages/SystemUI/res/values/strings.xml
+index 66ff487..d095d52 100755
+--- a/packages/SystemUI/res/values/strings.xml
++++ b/packages/SystemUI/res/values/strings.xml
+@@ -1140,5 +1140,9 @@
+ 
+     <!-- Bluetooth enablement ok text [CHAR LIMIT=40] -->
+     <string name="enable_bluetooth_confirmation_ok">Turn on</string>
+-
++    
++    <string name="statusbar_icon_wifi">"WLAN"</string>
++    <string name="statusbar_icon_ble">"蓝牙"</string>
++    <string name="statusbar_icon_air">"飞行模式"</string>
++    <string name="statusbar_icon_setting">"设置"</string>
+ </resources>
+diff --git a/packages/SystemUI/src/com/android/systemui/SystemUIApplication.java b/packages/SystemUI/src/com/android/systemui/SystemUIApplication.java
+old mode 100644
+new mode 100755
+index 78bbd3c..cb89fd3
+--- a/packages/SystemUI/src/com/android/systemui/SystemUIApplication.java
++++ b/packages/SystemUI/src/com/android/systemui/SystemUIApplication.java
+@@ -28,6 +28,8 @@ import android.util.Log;
+ import java.util.HashMap;
+ import java.util.Map;
+ 
++import com.android.systemui.utils.XMLUtils;
++
+ /**
+  * Application class for SystemUI.
+  */
+@@ -78,7 +80,8 @@ public class SystemUIApplication extends Application {
+         // application theme in the manifest does only work for activities. Keep this in sync with
+         // the theme set there.
+         setTheme(R.style.systemui_theme);
+-       isVr = "vr".equals(SystemProperties.get("ro.target.product", "unknown"));
++        isVr = "vr".equals(SystemProperties.get("ro.target.product", "unknown"));
++		
+         IntentFilter filter = new IntentFilter(Intent.ACTION_BOOT_COMPLETED);
+         filter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
+         registerReceiver(new BroadcastReceiver() {
+@@ -97,6 +100,8 @@ public class SystemUIApplication extends Application {
+                 }
+             }
+         }, filter);
++
++		XMLUtils.getInstance();
+     }
+ 
+     /**
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/QSPanel.java b/packages/SystemUI/src/com/android/systemui/qs/QSPanel.java
+old mode 100644
+new mode 100755
+index 94d5170..672a13e
+--- a/packages/SystemUI/src/com/android/systemui/qs/QSPanel.java
++++ b/packages/SystemUI/src/com/android/systemui/qs/QSPanel.java
+@@ -45,6 +45,8 @@ import com.android.systemui.statusbar.policy.BrightnessMirrorController;
+ import java.util.ArrayList;
+ import java.util.Collection;
+ 
++import com.android.systemui.utils.XMLUtils;
++
+ /** View that represents the quick settings tile panel. **/
+ public class QSPanel extends ViewGroup {
+     private static final float TILE_ASPECT = 1.2f;
+@@ -486,7 +488,9 @@ public class QSPanel extends ViewGroup {
+             record.tileView.measure(exactly(cw), exactly(ch));
+             previousView = record.tileView.updateAccessibilityOrder(previousView);
+         }
+-        int h = rows == 0 ? brightnessHeight : (getRowTop(rows) + mPanelPaddingBottom);
++        int h = rows == 0 ? brightnessHeight : (getRowTop(rows) + mPanelPaddingBottom +
++            (mSwapBrightnessLocation ? brightnessHeight : 0));
++		
+         if (mFooter.hasFooter()) {
+             h += mFooter.getView().getMeasuredHeight();
+         }
+@@ -501,13 +505,13 @@ public class QSPanel extends ViewGroup {
+     private static int exactly(int size) {
+         return MeasureSpec.makeMeasureSpec(size, MeasureSpec.EXACTLY);
+     }
+-
++	
+     @Override
+     protected void onLayout(boolean changed, int l, int t, int r, int b) {
+         final int w = getWidth();
+-        mBrightnessView.layout(0, mBrightnessPaddingTop,
+-                mBrightnessView.getMeasuredWidth(),
+-                mBrightnessPaddingTop + mBrightnessView.getMeasuredHeight());
++        //mBrightnessView.layout(0, mBrightnessPaddingTop,
++        //        mBrightnessView.getMeasuredWidth(),
++        //        mBrightnessPaddingTop + mBrightnessView.getMeasuredHeight());
+         boolean isRtl = getLayoutDirection() == LAYOUT_DIRECTION_RTL;
+         for (TileRecord record : mRecords) {
+             if (record.tileView.getVisibility() == GONE) continue;
+@@ -526,6 +530,20 @@ public class QSPanel extends ViewGroup {
+             }
+             record.tileView.layout(left, top, right, top + record.tileView.getMeasuredHeight());
+         }
++
++		if (!mRecords.isEmpty() && mSwapBrightnessLocation) {
++		    TileRecord record = mRecords.get(mRecords.size() - 1);
++		    int brightnessTop = record.tileView.getMeasuredHeight() + mBrightnessPaddingTop;
++
++		    mBrightnessView.layout(0, brightnessTop,
++		        mBrightnessView.getMeasuredWidth(),
++		        brightnessTop + mBrightnessView.getMeasuredHeight());
++		} else {
++		    mBrightnessView.layout(0, mBrightnessPaddingTop,
++		        mBrightnessView.getMeasuredWidth(),
++		        mBrightnessPaddingTop + mBrightnessView.getMeasuredHeight());
++		}
++		
+         final int dh = Math.max(mDetail.getMeasuredHeight(), getMeasuredHeight());
+         mDetail.layout(0, 0, mDetail.getMeasuredWidth(), dh);
+         if (mFooter.hasFooter()) {
+@@ -535,12 +553,17 @@ public class QSPanel extends ViewGroup {
+         }
+     }
+ 
++	private static final boolean mSwapBrightnessLocation = XMLUtils.getInstance().checkMatch(
++	    XMLUtils.Group.GROUP_QSPANEL_SWITCH, XMLUtils.Attr.ATTR_ASSET_CHOOSE, XMLUtils.Policy.POLICY_SWAP_SEEKBAR_TILES);
++	    
+     private int getRowTop(int row) {
+-        if (row <= 0) return mBrightnessView.getMeasuredHeight() + mBrightnessPaddingTop;
+-        return mBrightnessView.getMeasuredHeight() + mBrightnessPaddingTop
+-                + mLargeCellHeight - mDualTileUnderlap + (row - 1) * mCellHeight;
++        final int brightnessHeight = mSwapBrightnessLocation ? 
++			 0 : (mBrightnessView.getMeasuredHeight() + mBrightnessPaddingTop);
++		
++		if (row <= 0) return brightnessHeight;
++		return brightnessHeight + mLargeCellHeight - mDualTileUnderlap + (row - 1) * mCellHeight;
+     }
+-
++	
+     private int getColumnCount(int row) {
+         int cols = 0;
+         for (TileRecord record : mRecords) {
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/QSTile.java b/packages/SystemUI/src/com/android/systemui/qs/QSTile.java
+old mode 100644
+new mode 100755
+index e4a37fb..4afe6a1
+--- a/packages/SystemUI/src/com/android/systemui/qs/QSTile.java
++++ b/packages/SystemUI/src/com/android/systemui/qs/QSTile.java
+@@ -327,6 +327,7 @@ public abstract class QSTile<TState extends State> implements Listenable {
+         Looper getLooper();
+         Context getContext();
+         Collection<QSTile<?>> getTiles();
++		QSTile<?> getTiles(String tileSpec);
+         void setCallback(Callback callback);
+         BluetoothController getBluetoothController();
+         LocationController getLocationController();
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/tiles/BluetoothTile.java b/packages/SystemUI/src/com/android/systemui/qs/tiles/BluetoothTile.java
+old mode 100644
+new mode 100755
+index abce31f..79f3c0a
+--- a/packages/SystemUI/src/com/android/systemui/qs/tiles/BluetoothTile.java
++++ b/packages/SystemUI/src/com/android/systemui/qs/tiles/BluetoothTile.java
+@@ -36,8 +36,12 @@ import com.android.systemui.statusbar.policy.BluetoothController;
+ import java.util.Collection;
+ import java.util.Set;
+ 
++import android.util.Log;
++
+ /** Quick settings tile: Bluetooth **/
+ public class BluetoothTile extends QSTile<QSTile.BooleanState>  {
++	private static final String TAG = "WifiTile";
++
+     private static final Intent BLUETOOTH_SETTINGS = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
+ 
+     private final BluetoothController mController;
+@@ -74,7 +78,7 @@ public class BluetoothTile extends QSTile<QSTile.BooleanState>  {
+     }
+ 
+     @Override
+-    protected void handleClick() {
++    public void handleClick() {
+         final boolean isEnabled = (Boolean)mState.value;
+         MetricsLogger.action(mContext, getMetricsCategory(), !isEnabled);
+         mController.setBluetoothEnabled(!isEnabled);
+@@ -89,6 +93,11 @@ public class BluetoothTile extends QSTile<QSTile.BooleanState>  {
+         showDetail(true);
+     }
+ 
++	@Override
++	public void handleLongClick() {
++        mHost.startActivityDismissingKeyguard(BLUETOOTH_SETTINGS);
++    }
++
+     @Override
+     protected void handleUpdateState(BooleanState state, Object arg) {
+         final boolean supported = mController.isBluetoothSupported();
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/tiles/WifiTile.java b/packages/SystemUI/src/com/android/systemui/qs/tiles/WifiTile.java
+old mode 100644
+new mode 100755
+index e654efd..2c49ac3
+--- a/packages/SystemUI/src/com/android/systemui/qs/tiles/WifiTile.java
++++ b/packages/SystemUI/src/com/android/systemui/qs/tiles/WifiTile.java
+@@ -39,8 +39,11 @@ import com.android.systemui.statusbar.policy.SignalCallbackAdapter;
+ 
+ import java.util.List;
+ 
++import android.util.Log;
++
+ /** Quick settings tile: Wifi **/
+ public class WifiTile extends QSTile<QSTile.SignalState> {
++    private static final String TAG = "WifiTile";
+     private static final Intent WIFI_SETTINGS = new Intent(Settings.ACTION_WIFI_SETTINGS);
+ 
+     private final NetworkController mController;
+@@ -96,7 +99,7 @@ public class WifiTile extends QSTile<QSTile.SignalState> {
+     }
+ 
+     @Override
+-    protected void handleClick() {
++    public void handleClick() {
+         mState.copyTo(mStateBeforeClick);
+         MetricsLogger.action(mContext, getMetricsCategory(), !mState.enabled);
+         mController.setWifiEnabled(!mState.enabled);
+@@ -115,6 +118,11 @@ public class WifiTile extends QSTile<QSTile.SignalState> {
+         showDetail(true);
+     }
+ 
++	@Override
++	public void handleLongClick() {
++        mHost.startActivityDismissingKeyguard(WIFI_SETTINGS);
++    }
++	
+     @Override
+     protected void handleUpdateState(SignalState state, Object arg) {
+         state.visible = true;
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/BaseStatusBar.java b/packages/SystemUI/src/com/android/systemui/statusbar/BaseStatusBar.java
+old mode 100644
+new mode 100755
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/SignalClusterView.java b/packages/SystemUI/src/com/android/systemui/statusbar/SignalClusterView.java
+old mode 100644
+new mode 100755
+index cc30882..535b9bd
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/SignalClusterView.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/SignalClusterView.java
+@@ -44,6 +44,8 @@ import com.android.systemui.tuner.TunerService.Tunable;
+ import java.util.ArrayList;
+ import java.util.List;
+ 
++import com.android.systemui.utils.XMLUtils;
++
+ // Intimately tied to the design of res/layout/signal_cluster_view.xml
+ public class SignalClusterView
+         extends LinearLayout
+@@ -247,9 +249,12 @@ public class SignalClusterView
+         apply();
+     }
+ 
++	private static final boolean disSIM = XMLUtils.getInstance().checkMatch(
++	    XMLUtils.Group.GROUP_STATUSBAR_SWITCH, XMLUtils.Attr.ATTR_ASSET_CHOOSE, XMLUtils.Policy.POLICY_HIDE_UNSUPPORT_PRO);
++	
+     @Override
+     public void setNoSims(boolean show) {
+-        mNoSimsVisible = show && !mBlockMobile;
++        mNoSimsVisible = show && !mBlockMobile && !disSIM;
+         apply();
+     }
+ 
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/NotificationPanelView.java b/packages/SystemUI/src/com/android/systemui/statusbar/phone/NotificationPanelView.java
+old mode 100644
+new mode 100755
+index 5273652..d5dda86
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/NotificationPanelView.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/NotificationPanelView.java
+@@ -66,6 +66,8 @@ import com.android.systemui.statusbar.stack.StackStateAnimator;
+ 
+ import java.util.List;
+ 
++import com.android.systemui.utils.XMLUtils;
++
+ public class NotificationPanelView extends PanelView implements
+         ExpandableView.OnHeightChangedListener, ObservableScrollView.Listener,
+         View.OnClickListener, NotificationStackScrollLayout.OnOverscrollTopChangedListener,
+@@ -281,7 +283,13 @@ public class NotificationPanelView extends PanelView implements
+         mFlingAnimationUtils = new FlingAnimationUtils(getContext(), 0.4f);
+         mStatusBarMinHeight = getResources().getDimensionPixelSize(
+                 com.android.internal.R.dimen.status_bar_height);
+-        mQsPeekHeight = getResources().getDimensionPixelSize(R.dimen.qs_peek_height);
++
++		if (XMLUtils.getInstance().checkMatch(XMLUtils.Group.GROUP_QSPANEL_SWITCH, XMLUtils.Attr.ATTR_ASSET_CHOOSE, XMLUtils.Policy.POLICY_DISABLE_QSPANEL)) {
++			mQsPeekHeight = -(getResources().getDimensionPixelSize(R.dimen.qs_peek_height));
++		} else {
++			mQsPeekHeight = getResources().getDimensionPixelSize(R.dimen.qs_peek_height);
++		}
++		
+         mNotificationsHeaderCollideDistance =
+                 getResources().getDimensionPixelSize(R.dimen.header_notifications_collide_distance);
+         mUnlockMoveDistance = getResources().getDimensionPixelOffset(R.dimen.unlock_move_distance);
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java b/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
+index aa1d4af..35e094b 100755
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
+@@ -200,6 +200,8 @@ import android.os.Handler;
+ import android.util.Log;
+ import com.android.systemui.screenshot.ScreenshotUtils;
+ 
++import com.android.systemui.utils.XMLUtils;
++
+ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+         DragDownHelper.DragDownCallback, ActivityStarter, OnUnlockMethodChangedListener,
+         HeadsUpManager.OnHeadsUpChangedListener {
+@@ -1543,13 +1545,16 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+         mShadeUpdates.check();
+     }
+ 
++	private static final boolean disQSPanel= XMLUtils.getInstance().checkMatch(
++	    XMLUtils.Group.GROUP_QSPANEL_SWITCH, XMLUtils.Attr.ATTR_ASSET_CHOOSE, XMLUtils.Policy.POLICY_DISABLE_QSPANEL);
++	
+     /**
+      * Disable QS if device not provisioned.
+      * If the user switcher is simple then disable QS during setup because
+      * the user intends to use the lock screen user switcher, QS in not needed.
+      */
+     private void updateQsExpansionEnabled() {
+-        mNotificationPanel.setQsExpansionEnabled(isDeviceProvisioned()
++        mNotificationPanel.setQsExpansionEnabled((isDeviceProvisioned() && !disQSPanel)
+                 && (mUserSetup || mUserSwitcherController == null
+                         || !mUserSwitcherController.isSimpleUserSwitcher())
+                 && ((mDisabled2 & StatusBarManager.DISABLE2_QUICK_SETTINGS) == 0)
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/QSTileHost.java b/packages/SystemUI/src/com/android/systemui/statusbar/phone/QSTileHost.java
+old mode 100644
+new mode 100755
+index e66c63b..b0902e1
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/QSTileHost.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/QSTileHost.java
+@@ -128,6 +128,15 @@ public class QSTileHost implements QSTile.Host, Tunable {
+     public Collection<QSTile<?>> getTiles() {
+         return mTiles.values();
+     }
++	
++	@Override
++	public QSTile<?> getTiles(String tileSpec) {
++		if (mTiles.containsKey(tileSpec)) {
++            return mTiles.get(tileSpec);
++        }
++		
++		return createTile(tileSpec);
++	}
+ 
+     @Override
+     public void startActivityDismissingKeyguard(final Intent intent) {
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarHeaderView.java b/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarHeaderView.java
+old mode 100644
+new mode 100755
+index 971978d..8f04e3f
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarHeaderView.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarHeaderView.java
+@@ -53,420 +53,192 @@ import com.android.systemui.statusbar.policy.UserInfoController;
+ import com.android.systemui.tuner.TunerService;
+ 
+ import java.text.NumberFormat;
++import android.util.Log;
++
++import com.android.systemui.qs.tiles.WifiTile;
++import com.android.systemui.qs.tiles.BluetoothTile;
++import com.android.systemui.qs.tiles.AirplaneModeTile;
++
++import com.android.systemui.statusbar.phone.QSTileHost;
++import com.android.systemui.statusbar.widget.CombinationITButton;
++import com.android.systemui.statusbar.widget.CombinationITButton.OnClickCallbcak;
++
++import android.widget.SeekBar;
++import com.android.systemui.statusbar.widget.BrightnessSeekbar;
+ 
+ /**
+  * The view to manage the header area in the expanded status bar.
+  */
+-public class StatusBarHeaderView extends RelativeLayout implements View.OnClickListener,
++public class StatusBarHeaderView extends LinearLayout implements View.OnClickListener,
+         BatteryController.BatteryStateChangeCallback, NextAlarmController.NextAlarmChangeCallback,
+         EmergencyListener {
+-
+-    private boolean mExpanded;
+-    private boolean mListening;
+-
+-    private ViewGroup mSystemIconsContainer;
+-    private View mSystemIconsSuperContainer;
+-    private View mDateGroup;
+-    private View mClock;
+-    private TextView mTime;
+-    private TextView mAmPm;
+-    private MultiUserSwitch mMultiUserSwitch;
+-    private ImageView mMultiUserAvatar;
+-    private TextView mDateCollapsed;
+-    private TextView mDateExpanded;
+-    private LinearLayout mSystemIcons;
+-    private View mSignalCluster;
+-    private SettingsButton mSettingsButton;
+-    private View mSettingsContainer;
+-    private View mQsDetailHeader;
+-    private TextView mQsDetailHeaderTitle;
+-    private Switch mQsDetailHeaderSwitch;
+-    private ImageView mQsDetailHeaderProgress;
+-    private TextView mEmergencyCallsOnly;
+-    private TextView mBatteryLevel;
+-    private TextView mAlarmStatus;
+-
+-    private boolean mShowEmergencyCallsOnly;
+-    private boolean mAlarmShowing;
+-    private AlarmManager.AlarmClockInfo mNextAlarm;
+-
+-    private int mCollapsedHeight;
++        
++	static final String TAG = "StatusBarHeaderView";
++	
++	private int mCollapsedHeight;
+     private int mExpandedHeight;
+ 
+-    private int mMultiUserExpandedMargin;
+-    private int mMultiUserCollapsedMargin;
+-
+-    private int mClockMarginBottomExpanded;
+-    private int mClockMarginBottomCollapsed;
+-    private int mMultiUserSwitchWidthCollapsed;
+-    private int mMultiUserSwitchWidthExpanded;
+-
+-    private int mClockCollapsedSize;
+-    private int mClockExpandedSize;
++	private boolean mExpanded;
++	private boolean mListening;
++	
++	private final Rect mClipBounds = new Rect();
+ 
+-    /**
+-     * In collapsed QS, the clock and avatar are scaled down a bit post-layout to allow for a nice
+-     * transition. These values determine that factor.
+-     */
+-    private float mClockCollapsedScaleFactor;
+-    private float mAvatarCollapsedScaleFactor;
+-
+-    private ActivityStarter mActivityStarter;
+-    private BatteryController mBatteryController;
+-    private NextAlarmController mNextAlarmController;
+-    private QSPanel mQSPanel;
+-
+-    private final Rect mClipBounds = new Rect();
+-
+-    private boolean mCaptureValues;
+-    private boolean mSignalClusterDetached;
+-    private final LayoutValues mCollapsedValues = new LayoutValues();
++	private float mCurrentT;
++	private boolean mCaptureValues;
++	private final LayoutValues mCollapsedValues = new LayoutValues();
+     private final LayoutValues mExpandedValues = new LayoutValues();
+     private final LayoutValues mCurrentValues = new LayoutValues();
+ 
+-    private float mCurrentT;
+-    private boolean mShowingDetail;
+-    private boolean mDetailTransitioning;
++	private final Context mContext;
++	private CombinationITButton mIcon_wifi;
++	private CombinationITButton mIcon_ble;
++	private CombinationITButton mIcon_airplane;
++	private CombinationITButton mIcon_setting;
++	private BrightnessSeekbar mBrightnessSeekBar;
+ 
++	private ActivityStarter mActivityStarter;
++	
+     public StatusBarHeaderView(Context context, AttributeSet attrs) {
+         super(context, attrs);
++		mContext = context;
+     }
+ 
+-    @Override
++	@Override
+     protected void onFinishInflate() {
+         super.onFinishInflate();
+-        mSystemIconsSuperContainer = findViewById(R.id.system_icons_super_container);
+-        mSystemIconsContainer = (ViewGroup) findViewById(R.id.system_icons_container);
+-        mSystemIconsSuperContainer.setOnClickListener(this);
+-        mDateGroup = findViewById(R.id.date_group);
+-        mClock = findViewById(R.id.clock);
+-        mTime = (TextView) findViewById(R.id.time_view);
+-        mAmPm = (TextView) findViewById(R.id.am_pm_view);
+-        mMultiUserSwitch = (MultiUserSwitch) findViewById(R.id.multi_user_switch);
+-        mMultiUserAvatar = (ImageView) findViewById(R.id.multi_user_avatar);
+-        mDateCollapsed = (TextView) findViewById(R.id.date_collapsed);
+-        mDateExpanded = (TextView) findViewById(R.id.date_expanded);
+-        mSettingsButton = (SettingsButton) findViewById(R.id.settings_button);
+-        mSettingsContainer = findViewById(R.id.settings_button_container);
+-        mSettingsButton.setOnClickListener(this);
+-        mQsDetailHeader = findViewById(R.id.qs_detail_header);
+-        mQsDetailHeader.setAlpha(0);
+-        mQsDetailHeaderTitle = (TextView) mQsDetailHeader.findViewById(android.R.id.title);
+-        mQsDetailHeaderSwitch = (Switch) mQsDetailHeader.findViewById(android.R.id.toggle);
+-        mQsDetailHeaderProgress = (ImageView) findViewById(R.id.qs_detail_header_progress);
+-        mEmergencyCallsOnly = (TextView) findViewById(R.id.header_emergency_calls_only);
+-        mBatteryLevel = (TextView) findViewById(R.id.battery_level);
+-        mAlarmStatus = (TextView) findViewById(R.id.alarm_status);
+-        mAlarmStatus.setOnClickListener(this);
+-        mSignalCluster = findViewById(R.id.signal_cluster);
+-        mSystemIcons = (LinearLayout) findViewById(R.id.system_icons);
+-        loadDimens();
+-        updateVisibilities();
+-        updateClockScale();
+-        updateAvatarScale();
+-        addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+-            @Override
+-            public void onLayoutChange(View v, int left, int top, int right,
+-                    int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom) {
+-                if ((right - left) != (oldRight - oldLeft)) {
+-                    // width changed, update clipping
+-                    setClipping(getHeight());
+-                }
+-                boolean rtl = getLayoutDirection() == LAYOUT_DIRECTION_RTL;
+-                mTime.setPivotX(rtl ? mTime.getWidth() : 0);
+-                mTime.setPivotY(mTime.getBaseline());
+-                updateAmPmTranslation();
+-            }
+-        });
+-        setOutlineProvider(new ViewOutlineProvider() {
+-            @Override
+-            public void getOutline(View view, Outline outline) {
+-                outline.setRect(mClipBounds);
+-            }
+-        });
+-        requestCaptureValues();
+-
+-        // RenderThread is doing more harm than good when touching the header (to expand quick
+-        // settings), so disable it for this view
+-        ((RippleDrawable) getBackground()).setForceSoftware(true);
+-        ((RippleDrawable) mSettingsButton.getBackground()).setForceSoftware(true);
+-        ((RippleDrawable) mSystemIconsSuperContainer.getBackground()).setForceSoftware(true);
+-    }
+-
+-    @Override
+-    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+-        super.onLayout(changed, l, t, r, b);
+-        if (mCaptureValues) {
+-            if (mExpanded) {
+-                captureLayoutValues(mExpandedValues);
+-            } else {
+-                captureLayoutValues(mCollapsedValues);
+-            }
+-            mCaptureValues = false;
+-            updateLayoutValues(mCurrentT);
+-        }
+-        mAlarmStatus.setX(mDateGroup.getLeft() + mDateCollapsed.getRight());
+-    }
++		loadDimens();
+ 
+-    @Override
+-    protected void onConfigurationChanged(Configuration newConfig) {
+-        super.onConfigurationChanged(newConfig);
+-        FontSizeUtils.updateFontSize(mBatteryLevel, R.dimen.battery_level_text_size);
+-        FontSizeUtils.updateFontSize(mEmergencyCallsOnly,
+-                R.dimen.qs_emergency_calls_only_text_size);
+-        FontSizeUtils.updateFontSize(mDateCollapsed, R.dimen.qs_date_collapsed_size);
+-        FontSizeUtils.updateFontSize(mDateExpanded, R.dimen.qs_date_collapsed_size);
+-        FontSizeUtils.updateFontSize(mAlarmStatus, R.dimen.qs_date_collapsed_size);
+-        FontSizeUtils.updateFontSize(this, android.R.id.title, R.dimen.qs_detail_header_text_size);
+-        FontSizeUtils.updateFontSize(this, android.R.id.toggle, R.dimen.qs_detail_header_text_size);
+-        FontSizeUtils.updateFontSize(mAmPm, R.dimen.qs_time_collapsed_size);
+-        FontSizeUtils.updateFontSize(this, R.id.empty_time_view, R.dimen.qs_time_expanded_size);
+-
+-        mEmergencyCallsOnly.setText(com.android.internal.R.string.emergency_calls_only);
+-
+-        mClockCollapsedSize = getResources().getDimensionPixelSize(R.dimen.qs_time_collapsed_size);
+-        mClockExpandedSize = getResources().getDimensionPixelSize(R.dimen.qs_time_expanded_size);
+-        mClockCollapsedScaleFactor = (float) mClockCollapsedSize / (float) mClockExpandedSize;
+-
+-        updateClockScale();
+-        updateClockCollapsedMargin();
+-    }
++		// Icon
++		initializeIcon();
+ 
+-    private void updateClockCollapsedMargin() {
+-        Resources res = getResources();
+-        int padding = res.getDimensionPixelSize(R.dimen.clock_collapsed_bottom_margin);
+-        int largePadding = res.getDimensionPixelSize(
+-                R.dimen.clock_collapsed_bottom_margin_large_text);
+-        float largeFactor = (MathUtils.constrain(getResources().getConfiguration().fontScale, 1.0f,
+-                FontSizeUtils.LARGE_TEXT_SCALE) - 1f) / (FontSizeUtils.LARGE_TEXT_SCALE - 1f);
+-        mClockMarginBottomCollapsed = Math.round((1 - largeFactor) * padding + largeFactor * largePadding);
+-        requestLayout();
++		// SeekBar
++		mBrightnessSeekBar = new BrightnessSeekbar(mContext, (SeekBar) findViewById(R.id.seekBar));
++		mBrightnessSeekBar.registerCallbacks();
+     }
+-
+-    private void requestCaptureValues() {
+-        mCaptureValues = true;
+-        requestLayout();
+-    }
+-
+-    private void loadDimens() {
++	
++	private void loadDimens() {
+         mCollapsedHeight = getResources().getDimensionPixelSize(R.dimen.status_bar_header_height);
+         mExpandedHeight = getResources().getDimensionPixelSize(
+                 R.dimen.status_bar_header_height_expanded);
+-        mMultiUserExpandedMargin =
+-                getResources().getDimensionPixelSize(R.dimen.multi_user_switch_expanded_margin);
+-        mMultiUserCollapsedMargin =
+-                getResources().getDimensionPixelSize(R.dimen.multi_user_switch_collapsed_margin);
+-        mClockMarginBottomExpanded =
+-                getResources().getDimensionPixelSize(R.dimen.clock_expanded_bottom_margin);
+-        updateClockCollapsedMargin();
+-        mMultiUserSwitchWidthCollapsed =
+-                getResources().getDimensionPixelSize(R.dimen.multi_user_switch_width_collapsed);
+-        mMultiUserSwitchWidthExpanded =
+-                getResources().getDimensionPixelSize(R.dimen.multi_user_switch_width_expanded);
+-        mAvatarCollapsedScaleFactor =
+-                getResources().getDimensionPixelSize(R.dimen.multi_user_avatar_collapsed_size)
+-                / (float) mMultiUserAvatar.getLayoutParams().width;
+-        mClockCollapsedSize = getResources().getDimensionPixelSize(R.dimen.qs_time_collapsed_size);
+-        mClockExpandedSize = getResources().getDimensionPixelSize(R.dimen.qs_time_expanded_size);
+-        mClockCollapsedScaleFactor = (float) mClockCollapsedSize / (float) mClockExpandedSize;
+-
+-    }
+-
+-    public void setActivityStarter(ActivityStarter activityStarter) {
+-        mActivityStarter = activityStarter;
+-    }
+ 
+-    public void setBatteryController(BatteryController batteryController) {
+-        mBatteryController = batteryController;
+-        ((BatteryMeterView) findViewById(R.id.battery)).setBatteryController(batteryController);
+-    }
+-
+-    public void setNextAlarmController(NextAlarmController nextAlarmController) {
+-        mNextAlarmController = nextAlarmController;
+-    }
+-
+-    public int getCollapsedHeight() {
++		Log.e(TAG, "mExpandedHeight: " + mExpandedHeight + ", mCollapsedHeight: " + mCollapsedHeight);
++    }
++
++	private void initializeIcon() {
++	    mIcon_wifi = (CombinationITButton) findViewById(R.id.icon_wifi);
++		mIcon_wifi.setOnClickCallBack(new OnClickCallbcak() {
++			@Override
++			public void onClick() {
++			    Log.e(TAG, "mIcon_wifi onClick");
++				mWifiTile.handleClick();
++			}
++			
++			@Override
++			public void onLongClick() {
++			    mWifiTile.handleLongClick();
++			}
++		});
++		
++		mIcon_ble = (CombinationITButton) findViewById(R.id.icon_ble);
++		mIcon_ble.setOnClickCallBack(new OnClickCallbcak() {
++			@Override
++			public void onClick() {
++			    Log.e(TAG, "mIcon_ble onClick");
++				mBluetoothTile.handleClick();
++			}
++
++			@Override
++			public void onLongClick() {
++			    mBluetoothTile.handleLongClick();
++			}
++		});
++			
++		mIcon_airplane = (CombinationITButton) findViewById(R.id.icon_air);
++		mIcon_airplane.setOnClickCallBack(new OnClickCallbcak() {
++			@Override
++			public void onClick() {
++			    Log.e(TAG, "mIcon_airplane onClick");
++				mAirplaneModeTile.handleClick();
++			}
++
++			@Override
++			public void onLongClick() {
++
++			}
++		});
++			
++		mIcon_setting = (CombinationITButton) findViewById(R.id.icon_settings);
++		mIcon_setting.setOnClickCallBack(new OnClickCallbcak() {
++			@Override
++			public void onClick() {
++			    Log.e(TAG, "mIcon_setting onClick");
++				mActivityStarter.startActivity(new Intent(android.provider.Settings.ACTION_SETTINGS), true /* dismissShade */);
++			}
++
++			@Override
++			public void onLongClick() {
++			    mActivityStarter.startActivity(new Intent(android.provider.Settings.ACTION_SETTINGS), true /* dismissShade */);
++			}
++		});
++	}
++
++	public void setActivityStarter(ActivityStarter activityStarter) {
++	    mActivityStarter = activityStarter;
++    }
++
++	private QSTile<?> bindTiles(QSTileHost host, String tileSpec, CombinationITButton v) {
++		QSTile<?> tiles = host.getTiles(tileSpec);
++		if (v != null) {
++			tiles.setCallback(v);
++		}
++		
++		return tiles;
++	}
++
++	WifiTile mWifiTile;
++	BluetoothTile mBluetoothTile;
++	AirplaneModeTile mAirplaneModeTile;
++	public void setQSPanel(QSPanel qsp) {
++	    QSTileHost host = qsp.getHost();
++		if (host != null) {
++			mWifiTile = (WifiTile) bindTiles(host, "wifi", mIcon_wifi);
++			mBluetoothTile = (BluetoothTile) bindTiles(host, "bt", mIcon_ble);
++ 		    mAirplaneModeTile = (AirplaneModeTile) bindTiles(host, "airplane", mIcon_airplane);
++		}
++    }
++
++	public void setUserInfoController(UserInfoController userInfoController) {
++	
++    }
++
++	public void setBatteryController(BatteryController batteryController) {
++	
++    }
++
++	public void setNextAlarmController(NextAlarmController nextAlarmController) {
++	
++    }
++
++	public int getCollapsedHeight() {
++	    Log.e(TAG, "mCollapsedHeight: " + mCollapsedHeight);
+         return mCollapsedHeight;
+     }
+ 
+-    public int getExpandedHeight() {
++	public int getExpandedHeight() {
++	    Log.e(TAG, "mExpandedHeight: " + mExpandedHeight);
+         return mExpandedHeight;
+     }
+ 
+-    public void setListening(boolean listening) {
+-        if (listening == mListening) {
+-            return;
+-        }
+-        mListening = listening;
+-        updateListeners();
+-    }
+-
+-    public void setExpanded(boolean expanded) {
++	public void setExpanded(boolean expanded) {
+         boolean changed = expanded != mExpanded;
+         mExpanded = expanded;
++		Log.e(TAG, "setExpanded changed:" + changed);
+         if (changed) {
+             updateEverything();
+         }
+     }
+ 
+-    public void updateEverything() {
+-        updateHeights();
+-        updateVisibilities();
+-        updateSystemIconsLayoutParams();
+-        updateClickTargets();
+-        updateMultiUserSwitch();
+-        updateClockScale();
+-        updateAvatarScale();
+-        updateClockLp();
+-        requestCaptureValues();
+-    }
+-
+-    private void updateHeights() {
+-        int height = mExpanded ? mExpandedHeight : mCollapsedHeight;
+-        ViewGroup.LayoutParams lp = getLayoutParams();
+-        if (lp.height != height) {
+-            lp.height = height;
+-            setLayoutParams(lp);
+-        }
+-    }
+-
+-    private void updateVisibilities() {
+-        mDateCollapsed.setVisibility(mExpanded && mAlarmShowing ? View.VISIBLE : View.INVISIBLE);
+-        mDateExpanded.setVisibility(mExpanded && mAlarmShowing ? View.INVISIBLE : View.VISIBLE);
+-        mAlarmStatus.setVisibility(mExpanded && mAlarmShowing ? View.VISIBLE : View.INVISIBLE);
+-        mSettingsContainer.setVisibility(mExpanded ? View.VISIBLE : View.INVISIBLE);
+-        mQsDetailHeader.setVisibility(mExpanded && mShowingDetail? View.VISIBLE : View.INVISIBLE);
+-        if (mSignalCluster != null) {
+-            updateSignalClusterDetachment();
+-        }
+-        mEmergencyCallsOnly.setVisibility(mExpanded && mShowEmergencyCallsOnly ? VISIBLE : GONE);
+-        mBatteryLevel.setVisibility(mExpanded ? View.VISIBLE : View.GONE);
+-        mSettingsContainer.findViewById(R.id.tuner_icon).setVisibility(
+-                TunerService.isTunerEnabled(mContext) ? View.VISIBLE : View.INVISIBLE);
+-    }
+-
+-    private void updateSignalClusterDetachment() {
+-        boolean detached = mExpanded;
+-        if (detached != mSignalClusterDetached) {
+-            if (detached) {
+-                getOverlay().add(mSignalCluster);
+-            } else {
+-                reattachSignalCluster();
+-            }
+-        }
+-        mSignalClusterDetached = detached;
+-    }
+-
+-    private void reattachSignalCluster() {
+-        getOverlay().remove(mSignalCluster);
+-        mSystemIcons.addView(mSignalCluster, 1);
+-    }
+-
+-    private void updateSystemIconsLayoutParams() {
+-        RelativeLayout.LayoutParams lp = (LayoutParams) mSystemIconsSuperContainer.getLayoutParams();
+-        int rule = mExpanded
+-                ? mSettingsContainer.getId()
+-                : mMultiUserSwitch.getId();
+-        if (rule != lp.getRules()[RelativeLayout.START_OF]) {
+-            lp.addRule(RelativeLayout.START_OF, rule);
+-            mSystemIconsSuperContainer.setLayoutParams(lp);
+-        }
+-    }
+-
+-    private void updateListeners() {
+-        if (mListening) {
+-            mBatteryController.addStateChangedCallback(this);
+-            mNextAlarmController.addStateChangedCallback(this);
+-        } else {
+-            mBatteryController.removeStateChangedCallback(this);
+-            mNextAlarmController.removeStateChangedCallback(this);
+-        }
+-    }
+-
+-    private void updateAvatarScale() {
+-        if (mExpanded) {
+-            mMultiUserAvatar.setScaleX(1f);
+-            mMultiUserAvatar.setScaleY(1f);
+-        } else {
+-            mMultiUserAvatar.setScaleX(mAvatarCollapsedScaleFactor);
+-            mMultiUserAvatar.setScaleY(mAvatarCollapsedScaleFactor);
+-        }
+-    }
+-
+-    private void updateClockScale() {
+-        mTime.setTextSize(TypedValue.COMPLEX_UNIT_PX, mExpanded
+-                ? mClockExpandedSize
+-                : mClockCollapsedSize);
+-        mTime.setScaleX(1f);
+-        mTime.setScaleY(1f);
+-        updateAmPmTranslation();
+-    }
+-
+-    private void updateAmPmTranslation() {
+-        boolean rtl = getLayoutDirection() == LAYOUT_DIRECTION_RTL;
+-        mAmPm.setTranslationX((rtl ? 1 : -1) * mTime.getWidth() * (1 - mTime.getScaleX()));
+-    }
+-
+-    @Override
+-    public void onBatteryLevelChanged(int level, boolean pluggedIn, boolean charging) {
+-        String percentage = NumberFormat.getPercentInstance().format((double) level / 100.0);
+-        mBatteryLevel.setText(percentage);
+-    }
+-
+-    @Override
+-    public void onPowerSaveChanged() {
+-        // could not care less
+-    }
+-
+-    @Override
+-    public void onNextAlarmChanged(AlarmManager.AlarmClockInfo nextAlarm) {
+-        mNextAlarm = nextAlarm;
+-        if (nextAlarm != null) {
+-            mAlarmStatus.setText(KeyguardStatusView.formatNextAlarm(getContext(), nextAlarm));
+-        }
+-        mAlarmShowing = nextAlarm != null;
+-        updateEverything();
+-        requestCaptureValues();
+-    }
+-
+-    private void updateClickTargets() {
+-        mMultiUserSwitch.setClickable(mExpanded);
+-        mMultiUserSwitch.setFocusable(mExpanded);
+-        mSystemIconsSuperContainer.setClickable(mExpanded);
+-        mSystemIconsSuperContainer.setFocusable(mExpanded);
+-        mAlarmStatus.setClickable(mNextAlarm != null && mNextAlarm.getShowIntent() != null);
+-    }
+-
+-    private void updateClockLp() {
+-        int marginBottom = mExpanded
+-                ? mClockMarginBottomExpanded
+-                : mClockMarginBottomCollapsed;
+-        LayoutParams lp = (LayoutParams) mDateGroup.getLayoutParams();
+-        if (marginBottom != lp.bottomMargin) {
+-            lp.bottomMargin = marginBottom;
+-            mDateGroup.setLayoutParams(lp);
+-        }
+-    }
+-
+-    private void updateMultiUserSwitch() {
+-        int marginEnd;
+-        int width;
+-        if (mExpanded) {
+-            marginEnd = mMultiUserExpandedMargin;
+-            width = mMultiUserSwitchWidthExpanded;
+-        } else {
+-            marginEnd = mMultiUserCollapsedMargin;
+-            width = mMultiUserSwitchWidthCollapsed;
+-        }
+-        MarginLayoutParams lp = (MarginLayoutParams) mMultiUserSwitch.getLayoutParams();
+-        if (marginEnd != lp.getMarginEnd() || lp.width != width) {
+-            lp.setMarginEnd(marginEnd);
+-            lp.width = width;
+-            mMultiUserSwitch.setLayoutParams(lp);
+-        }
+-    }
+-
+-    public void setExpansion(float t) {
++	public void setExpansion(float t) {
+         if (!mExpanded) {
+             t = 0f;
+         }
+@@ -482,196 +254,99 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
+         updateLayoutValues(t);
+     }
+ 
+-    private void updateLayoutValues(float t) {
++	private void updateLayoutValues(float t) {
+         if (mCaptureValues) {
+             return;
+         }
+         mCurrentValues.interpoloate(mCollapsedValues, mExpandedValues, t);
+-        applyLayoutValues(mCurrentValues);
+     }
+ 
+-    private void setClipping(float height) {
++	private void setClipping(float height) {
+         mClipBounds.set(getPaddingLeft(), 0, getWidth() - getPaddingRight(), (int) height);
+         setClipBounds(mClipBounds);
+         invalidateOutline();
+     }
+-
+-    public void setUserInfoController(UserInfoController userInfoController) {
+-        userInfoController.addListener(new UserInfoController.OnUserInfoChangedListener() {
+-            @Override
+-            public void onUserInfoChanged(String name, Drawable picture) {
+-                mMultiUserAvatar.setImageDrawable(picture);
+-            }
+-        });
+-    }
+-
+-    @Override
+-    public void onClick(View v) {
+-        if (v == mSettingsButton) {
+-            if (mSettingsButton.isTunerClick()) {
+-                if (TunerService.isTunerEnabled(mContext)) {
+-                    TunerService.showResetRequest(mContext, new Runnable() {
+-                        @Override
+-                        public void run() {
+-                            // Relaunch settings so that the tuner disappears.
+-                            startSettingsActivity();
+-                        }
+-                    });
+-                } else {
+-                    Toast.makeText(getContext(), R.string.tuner_toast, Toast.LENGTH_LONG).show();
+-                    TunerService.setTunerEnabled(mContext, true);
+-                }
+-            }
+-            startSettingsActivity();
+-        } else if (v == mSystemIconsSuperContainer) {
+-            startBatteryActivity();
+-        } else if (v == mAlarmStatus && mNextAlarm != null) {
+-            PendingIntent showIntent = mNextAlarm.getShowIntent();
+-            if (showIntent != null) {
+-                mActivityStarter.startPendingIntentDismissingKeyguard(showIntent);
+-            }
++	
++	public void setListening(boolean listening) {
++        if (listening == mListening) {
++            return;
+         }
++        mListening = listening;
++        updateListeners();
+     }
+ 
+-    private void startSettingsActivity() {
+-        mActivityStarter.startActivity(new Intent(android.provider.Settings.ACTION_SETTINGS),
+-                true /* dismissShade */);
++	private void updateListeners() {
++	
+     }
+-
+-    private void startBatteryActivity() {
+-        mActivityStarter.startActivity(new Intent(Intent.ACTION_POWER_USAGE_SUMMARY),
+-                true /* dismissShade */);
++	
++	public void updateEverything() {
++	    updateHeights();
++		requestCaptureValues();
+     }
+ 
+-    public void setQSPanel(QSPanel qsp) {
+-        mQSPanel = qsp;
+-        if (mQSPanel != null) {
+-            mQSPanel.setCallback(mQsPanelCallback);
+-        }
+-        mMultiUserSwitch.setQsPanel(qsp);
++	private void requestCaptureValues() {
++        mCaptureValues = true;
++        requestLayout();
+     }
+ 
+-    @Override
+-    public boolean shouldDelayChildPressedState() {
+-        return true;
++	private void updateHeights() {
++        /*
++        int height = mExpanded ? mExpandedHeight : mCollapsedHeight;
++        ViewGroup.LayoutParams lp = getLayoutParams();
++		Log.e(TAG, "lp.height: " + lp.height + ", height: " + height);
++        if (lp.height != height) {
++            lp.height = height;
++            setLayoutParams(lp);
++        }
++        */
+     }
+-
+-    @Override
+-    public void setEmergencyCallsOnly(boolean show) {
+-        boolean changed = show != mShowEmergencyCallsOnly;
+-        if (changed) {
+-            mShowEmergencyCallsOnly = show;
+-            if (mExpanded) {
+-                updateEverything();
+-                requestCaptureValues();
++	
++	@Override
++    protected void onLayout(boolean changed, int l, int t, int r, int b) {
++        super.onLayout(changed, l, t, r, b);
++		Log.e(TAG, "changed:" + changed + ", l:" + l + ", t:" + t + ", r:" + r + ", b:" + b);
++		
++        if (mCaptureValues) {
++			if (mExpanded) {
++                captureLayoutValues(mExpandedValues);
++            } else {
++                captureLayoutValues(mCollapsedValues);
+             }
++			
++            mCaptureValues = false;
++            updateLayoutValues(mCurrentT);
+         }
+     }
+ 
+-    @Override
+-    protected void dispatchSetPressed(boolean pressed) {
+-        // We don't want that everything lights up when we click on the header, so block the request
+-        // here.
++	private void captureLayoutValues(LayoutValues target) {
++    }
++	
++	@Override
++    public void onClick(View v) {
++        Log.e(TAG, "v:" + v);
+     }
+ 
+-    private void captureLayoutValues(LayoutValues target) {
+-        target.timeScale = mExpanded ? 1f : mClockCollapsedScaleFactor;
+-        target.clockY = mClock.getBottom();
+-        target.dateY = mDateGroup.getTop();
+-        target.emergencyCallsOnlyAlpha = getAlphaForVisibility(mEmergencyCallsOnly);
+-        target.alarmStatusAlpha = getAlphaForVisibility(mAlarmStatus);
+-        target.dateCollapsedAlpha = getAlphaForVisibility(mDateCollapsed);
+-        target.dateExpandedAlpha = getAlphaForVisibility(mDateExpanded);
+-        target.avatarScale = mMultiUserAvatar.getScaleX();
+-        target.avatarX = mMultiUserSwitch.getLeft() + mMultiUserAvatar.getLeft();
+-        target.avatarY = mMultiUserSwitch.getTop() + mMultiUserAvatar.getTop();
+-        if (getLayoutDirection() == LAYOUT_DIRECTION_LTR) {
+-            target.batteryX = mSystemIconsSuperContainer.getLeft()
+-                    + mSystemIconsContainer.getRight();
+-        } else {
+-            target.batteryX = mSystemIconsSuperContainer.getLeft()
+-                    + mSystemIconsContainer.getLeft();
+-        }
+-        target.batteryY = mSystemIconsSuperContainer.getTop() + mSystemIconsContainer.getTop();
+-        target.batteryLevelAlpha = getAlphaForVisibility(mBatteryLevel);
+-        target.settingsAlpha = getAlphaForVisibility(mSettingsContainer);
+-        target.settingsTranslation = mExpanded
+-                ? 0
+-                : mMultiUserSwitch.getLeft() - mSettingsContainer.getLeft();
+-        target.signalClusterAlpha = mSignalClusterDetached ? 0f : 1f;
+-        target.settingsRotation = !mExpanded ? 90f : 0f;
++	@Override
++    public void setEmergencyCallsOnly(boolean show) {
++
+     }
+ 
+-    private float getAlphaForVisibility(View v) {
+-        return v == null || v.getVisibility() == View.VISIBLE ? 1f : 0f;
++	@Override
++    public void onNextAlarmChanged(AlarmManager.AlarmClockInfo nextAlarm) {
++    
+     }
+ 
+-    private void applyAlpha(View v, float alpha) {
+-        if (v == null || v.getVisibility() == View.GONE) {
+-            return;
+-        }
+-        if (alpha == 0f) {
+-            v.setVisibility(View.INVISIBLE);
+-        } else {
+-            v.setVisibility(View.VISIBLE);
+-            v.setAlpha(alpha);
+-        }
++	@Override
++    public void onPowerSaveChanged() {
++        // could not care less
+     }
+ 
+-    private void applyLayoutValues(LayoutValues values) {
+-        mTime.setScaleX(values.timeScale);
+-        mTime.setScaleY(values.timeScale);
+-        mClock.setY(values.clockY - mClock.getHeight());
+-        mDateGroup.setY(values.dateY);
+-        mAlarmStatus.setY(values.dateY - mAlarmStatus.getPaddingTop());
+-        mMultiUserAvatar.setScaleX(values.avatarScale);
+-        mMultiUserAvatar.setScaleY(values.avatarScale);
+-        mMultiUserAvatar.setX(values.avatarX - mMultiUserSwitch.getLeft());
+-        mMultiUserAvatar.setY(values.avatarY - mMultiUserSwitch.getTop());
+-        if (getLayoutDirection() == LAYOUT_DIRECTION_LTR) {
+-            mSystemIconsSuperContainer.setX(values.batteryX - mSystemIconsContainer.getRight());
+-        } else {
+-            mSystemIconsSuperContainer.setX(values.batteryX - mSystemIconsContainer.getLeft());
+-        }
+-        mSystemIconsSuperContainer.setY(values.batteryY - mSystemIconsContainer.getTop());
+-        if (mSignalCluster != null && mExpanded) {
+-            if (getLayoutDirection() == LAYOUT_DIRECTION_LTR) {
+-                mSignalCluster.setX(mSystemIconsSuperContainer.getX()
+-                        - mSignalCluster.getWidth());
+-            } else {
+-                mSignalCluster.setX(mSystemIconsSuperContainer.getX()
+-                        + mSystemIconsSuperContainer.getWidth());
+-            }
+-            mSignalCluster.setY(
+-                    mSystemIconsSuperContainer.getY() + mSystemIconsSuperContainer.getHeight()/2
+-                            - mSignalCluster.getHeight()/2);
+-        } else if (mSignalCluster != null) {
+-            mSignalCluster.setTranslationX(0f);
+-            mSignalCluster.setTranslationY(0f);
+-        }
+-        if (!mSettingsButton.isAnimating()) {
+-            mSettingsContainer.setTranslationY(mSystemIconsSuperContainer.getTranslationY());
+-            mSettingsContainer.setTranslationX(values.settingsTranslation);
+-            mSettingsButton.setRotation(values.settingsRotation);
+-        }
+-        applyAlpha(mEmergencyCallsOnly, values.emergencyCallsOnlyAlpha);
+-        if (!mShowingDetail && !mDetailTransitioning) {
+-            // Otherwise it needs to stay invisible
+-            applyAlpha(mAlarmStatus, values.alarmStatusAlpha);
+-        }
+-        applyAlpha(mDateCollapsed, values.dateCollapsedAlpha);
+-        applyAlpha(mDateExpanded, values.dateExpandedAlpha);
+-        applyAlpha(mBatteryLevel, values.batteryLevelAlpha);
+-        applyAlpha(mSettingsContainer, values.settingsAlpha);
+-        applyAlpha(mSignalCluster, values.signalClusterAlpha);
+-        if (!mExpanded) {
+-            mTime.setScaleX(1f);
+-            mTime.setScaleY(1f);
+-        }
+-        updateAmPmTranslation();
++	@Override
++    public void onBatteryLevelChanged(int level, boolean pluggedIn, boolean charging) {
++    
+     }
+ 
+-    /**
++	/**
+      * Captures all layout values (position, visibility) for a certain state. This is used for
+      * animations.
+      */
+@@ -722,111 +397,4 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
+             alarmStatusAlpha = v1.alarmStatusAlpha * (1 - t3) + v2.alarmStatusAlpha * t3;
+         }
+     }
+-
+-    private final QSPanel.Callback mQsPanelCallback = new QSPanel.Callback() {
+-        private boolean mScanState;
+-
+-        @Override
+-        public void onToggleStateChanged(final boolean state) {
+-            post(new Runnable() {
+-                @Override
+-                public void run() {
+-                    handleToggleStateChanged(state);
+-                }
+-            });
+-        }
+-
+-        @Override
+-        public void onShowingDetail(final QSTile.DetailAdapter detail) {
+-            mDetailTransitioning = true;
+-            post(new Runnable() {
+-                @Override
+-                public void run() {
+-                    handleShowingDetail(detail);
+-                }
+-            });
+-        }
+-
+-        @Override
+-        public void onScanStateChanged(final boolean state) {
+-            post(new Runnable() {
+-                @Override
+-                public void run() {
+-                    handleScanStateChanged(state);
+-                }
+-            });
+-        }
+-
+-        private void handleToggleStateChanged(boolean state) {
+-            mQsDetailHeaderSwitch.setChecked(state);
+-        }
+-
+-        private void handleScanStateChanged(boolean state) {
+-            if (mScanState == state) return;
+-            mScanState = state;
+-            final Animatable anim = (Animatable) mQsDetailHeaderProgress.getDrawable();
+-            if (state) {
+-                mQsDetailHeaderProgress.animate().alpha(1f);
+-                anim.start();
+-            } else {
+-                mQsDetailHeaderProgress.animate().alpha(0f);
+-                anim.stop();
+-            }
+-        }
+-
+-        private void handleShowingDetail(final QSTile.DetailAdapter detail) {
+-            final boolean showingDetail = detail != null;
+-            transition(mClock, !showingDetail);
+-            transition(mDateGroup, !showingDetail);
+-            if (mAlarmShowing) {
+-                transition(mAlarmStatus, !showingDetail);
+-            }
+-            transition(mQsDetailHeader, showingDetail);
+-            mShowingDetail = showingDetail;
+-            if (showingDetail) {
+-                mQsDetailHeaderTitle.setText(detail.getTitle());
+-                final Boolean toggleState = detail.getToggleState();
+-                if (toggleState == null) {
+-                    mQsDetailHeaderSwitch.setVisibility(INVISIBLE);
+-                    mQsDetailHeader.setClickable(false);
+-                } else {
+-                    mQsDetailHeaderSwitch.setVisibility(VISIBLE);
+-                    mQsDetailHeaderSwitch.setChecked(toggleState);
+-                    mQsDetailHeader.setClickable(true);
+-                    mQsDetailHeader.setOnClickListener(new OnClickListener() {
+-                        @Override
+-                        public void onClick(View v) {
+-                            boolean checked = !mQsDetailHeaderSwitch.isChecked();
+-                            mQsDetailHeaderSwitch.setChecked(checked);
+-                            detail.setToggleState(checked);
+-                        }
+-                    });
+-                }
+-            } else {
+-                mQsDetailHeader.setClickable(false);
+-            }
+-        }
+-
+-        private void transition(final View v, final boolean in) {
+-            if (in) {
+-                v.bringToFront();
+-                v.setVisibility(VISIBLE);
+-            }
+-            if (v.hasOverlappingRendering()) {
+-                v.animate().withLayer();
+-            }
+-            v.animate()
+-                    .alpha(in ? 1 : 0)
+-                    .withEndAction(new Runnable() {
+-                        @Override
+-                        public void run() {
+-                            if (!in) {
+-                                v.setVisibility(INVISIBLE);
+-                            }
+-                            mDetailTransitioning = false;
+-                        }
+-                    })
+-                    .start();
+-        }
+-    };
+ }

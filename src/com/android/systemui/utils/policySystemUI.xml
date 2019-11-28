@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+*    statusbar_switch:  用于开关 状态栏 的界面视图
+*    notification_switch:  用于开关 下拉通知栏 的界面视图
+*    qspanel_switch:  用于改变 qspanel 的界面视图
+-->
+<xml_assets version="1.0">
+    <group name="statusbar_switch">
+        <asset choose="switch_hide_unsupport_pro" />
+	</group>
+    
+    <group name="notification_switch">
+        <asset choose="switch_notificationbar" />
+    </group>
+    
+    <group name="qspanel_switch">
+        <asset choose="switch_disable_qspanel" />
+        <!--<asset choose="switch_swap_brightness_tiles_location" />-->
+    </group>
+</xml_assets>
