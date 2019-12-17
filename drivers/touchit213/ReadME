@@ -1,0 +1,60 @@
+make rockchip_defconfig
+	make rk3288-tb_8846.img -j8
+
+================================================================
+1. 移植触摸校准程序(电阻屏)
+#elif defined(CONFIG_TOUCHSCREEN_800X480)
+	.x_min			= 0,
+	.x_max			= 800,
+	.y_min			= 0,
+	.y_max			= 480,
+	.screen_x[5] = { 50, 750,  50, 750, 400};
+  	.screen_y[5] = { 40,  40, 440, 440, 240};
+	.uncali_x_default[5] = { 438,  565, 3507,  3631, 2105 };
+	.uncali_y_default[5] = {  3756,  489, 3792, 534, 2159 };
+    
+    
+#if defined(CONFIG_TOUCHSCREEN_XPT2046_SPI)
+	{
+		.modalias	= "xpt2046_ts",
+		.chip_select	= 0,// 2,
+		.max_speed_hz	= 125 * 1000 * 26,/* (max sample rate @ 3V) * (cmd + data + overhead) */
+		.bus_num	= 0,
+		.irq = XPT2046_GPIO_INT,
+		.platform_data = &xpt2046_info,
+	},
+#endif
+
+xpt2046_probe
+    tp_calib_iface_init(pdata->screen_x,pdata->screen_y,pdata->uncali_x_default,pdata->uncali_y_default);
+    
+xpt2046_remove
+    tp_calib_iface_exit();
+    
+    
+xpt2046_rx
+    x = packet->tc.x;
+	y = packet->tc.y;
+    TouchPanelCalibrateAPoint(x, y, &cal_x, &cal_y);
+
+am start com.cx.calibrate/.MainActivity
+cat /sys/class/calib_ifaces/debug
+cat /sys/class/calib_ifaces/touchadc
+cat /sys/class/calib_ifaces/recalibration
+
+=====================================================
+逐步落实触摸校准程序.
+1. echo 1 > recalibration  //将数据清空
+
+2. for 5 cat touchadc
+
+2.5. 将文件保存在 "/data/private/calibargs"
+    格式为: 
+        uncalib_x[0],uncalib_y[0],uncalib_x[1],uncalib_y[1],uncalib_x[2],uncalib_y[2],uncalib_x[3],uncalib_y[3],uncalib_x[4],uncalib_y[4],screen_xmax[0],screen_ymax[0]
+        
+3. cat touchadc  // 将校准数据计算并保存
+
+4. cat recalibration //将数据写入
+
+debug:
+cat /data/private/calibargs
