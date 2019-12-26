@@ -1,0 +1,27 @@
+diff --git a/include/hardware_legacy/AudioPolicyManagerBase.h b/include/hardware_legacy/AudioPolicyManagerBase.h
+old mode 100644
+new mode 100755
+index ceb915a..874898f
+--- a/include/hardware_legacy/AudioPolicyManagerBase.h
++++ b/include/hardware_legacy/AudioPolicyManagerBase.h
+@@ -56,6 +56,8 @@ namespace android_audio_legacy {
+ // Can be overridden by the audio.offload.min.duration.secs property
+ #define OFFLOAD_DEFAULT_MIN_DURATION_SECS 60
+ 
++#define ANDROID4_4_SUPPORT_MULIT_CHANNEL_RECORDING
++
+ // ----------------------------------------------------------------------------
+ // AudioPolicyManagerBase implements audio policy manager behavior common to all platforms.
+ // Each platform must implement an AudioPolicyManager class derived from AudioPolicyManagerBase
+@@ -296,6 +298,11 @@ protected:
+             AudioInputDescriptor(const IOProfile *profile);
+ 
+             status_t    dump(int fd);
++			
++#ifdef ANDROID4_4_SUPPORT_MULIT_CHANNEL_RECORDING
++			void setIoHandle(audio_io_handle_t ioHandle);
++			audio_io_handle_t			  mIoHandle;	// input handle
++#endif
+ 
+             uint32_t mSamplingRate;                     //
+             uint32_t mReqSamplingRate;                  // SamplingRate that app setted

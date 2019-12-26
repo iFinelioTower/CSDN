@@ -1,0 +1,172 @@
+diff --git a/include/system/audio.h b/include/system/audio.h
+old mode 100644
+new mode 100755
+index aa7ac02..c6e4d27
+--- a/include/system/audio.h
++++ b/include/system/audio.h
+@@ -93,6 +93,13 @@ typedef enum {
+      * (value must be 0)
+      */
+     AUDIO_SESSION_OUTPUT_MIX = 0,
++    
++    /* application does not specify an explicit session ID to be used,
++     * and requests a new session ID to be allocated
++     * TODO use unique values for AUDIO_SESSION_OUTPUT_MIX and AUDIO_SESSION_ALLOCATE,
++     * after all uses have been updated from 0 to the appropriate symbol, and have been tested.
++     */
++    AUDIO_SESSION_ALLOCATE = 0,
+ } audio_session_t;
+ 
+ /* Audio sub formats (see enum audio_format). */
+@@ -103,6 +110,8 @@ typedef enum {
+     AUDIO_FORMAT_PCM_SUB_8_BIT           = 0x2, /* DO NOT CHANGE - PCM unsigned 8 bits */
+     AUDIO_FORMAT_PCM_SUB_32_BIT          = 0x3, /* PCM signed .31 fixed point */
+     AUDIO_FORMAT_PCM_SUB_8_24_BIT        = 0x4, /* PCM signed 7.24 fixed point */
++    AUDIO_FORMAT_PCM_SUB_FLOAT           = 0x5, /* PCM single-precision floating point */
++    AUDIO_FORMAT_PCM_SUB_24_BIT_PACKED   = 0x6, /* PCM signed .23 fixed point packed in 3 bytes */
+ } audio_format_pcm_sub_fmt_t;
+ 
+ /* MP3 sub format field definition : can use 11 LSBs in the same way as MP3
+@@ -122,6 +131,16 @@ typedef enum {
+ /* AAC sub format field definition: specify profile or bitrate for recording... */
+ typedef enum {
+     AUDIO_FORMAT_AAC_SUB_NONE            = 0x0,
++    AUDIO_FORMAT_AAC_SUB_MAIN            = 0x1,
++    AUDIO_FORMAT_AAC_SUB_LC              = 0x2,
++    AUDIO_FORMAT_AAC_SUB_SSR             = 0x4,
++    AUDIO_FORMAT_AAC_SUB_LTP             = 0x8,
++    AUDIO_FORMAT_AAC_SUB_HE_V1           = 0x10,
++    AUDIO_FORMAT_AAC_SUB_SCALABLE        = 0x20,
++    AUDIO_FORMAT_AAC_SUB_ERLC            = 0x40,
++    AUDIO_FORMAT_AAC_SUB_LD              = 0x80,
++    AUDIO_FORMAT_AAC_SUB_HE_V2           = 0x100,
++    AUDIO_FORMAT_AAC_SUB_ELD             = 0x200,
+ } audio_format_aac_sub_fmt_t;
+ 
+ /* VORBIS sub format field definition: specify quality for recording... */
+@@ -161,6 +180,31 @@ typedef enum {
+                                         AUDIO_FORMAT_PCM_SUB_32_BIT),
+     AUDIO_FORMAT_PCM_8_24_BIT        = (AUDIO_FORMAT_PCM |
+                                         AUDIO_FORMAT_PCM_SUB_8_24_BIT),
++	AUDIO_FORMAT_PCM_FLOAT			 = (AUDIO_FORMAT_PCM |
++										AUDIO_FORMAT_PCM_SUB_FLOAT),
++	AUDIO_FORMAT_PCM_24_BIT_PACKED	 = (AUDIO_FORMAT_PCM |
++										AUDIO_FORMAT_PCM_SUB_24_BIT_PACKED),
++	AUDIO_FORMAT_AAC_MAIN			 = (AUDIO_FORMAT_AAC |
++										AUDIO_FORMAT_AAC_SUB_MAIN),
++	AUDIO_FORMAT_AAC_LC 			 = (AUDIO_FORMAT_AAC |
++										AUDIO_FORMAT_AAC_SUB_LC),
++	AUDIO_FORMAT_AAC_SSR			 = (AUDIO_FORMAT_AAC |
++										AUDIO_FORMAT_AAC_SUB_SSR),
++	AUDIO_FORMAT_AAC_LTP			 = (AUDIO_FORMAT_AAC |
++										AUDIO_FORMAT_AAC_SUB_LTP),
++	AUDIO_FORMAT_AAC_HE_V1			 = (AUDIO_FORMAT_AAC |
++										AUDIO_FORMAT_AAC_SUB_HE_V1),
++	AUDIO_FORMAT_AAC_SCALABLE		 = (AUDIO_FORMAT_AAC |
++										AUDIO_FORMAT_AAC_SUB_SCALABLE),
++	AUDIO_FORMAT_AAC_ERLC			 = (AUDIO_FORMAT_AAC |
++										AUDIO_FORMAT_AAC_SUB_ERLC),
++	AUDIO_FORMAT_AAC_LD 			 = (AUDIO_FORMAT_AAC |
++										AUDIO_FORMAT_AAC_SUB_LD),
++	AUDIO_FORMAT_AAC_HE_V2			 = (AUDIO_FORMAT_AAC |
++										AUDIO_FORMAT_AAC_SUB_HE_V2),
++	AUDIO_FORMAT_AAC_ELD			 = (AUDIO_FORMAT_AAC |
++										AUDIO_FORMAT_AAC_SUB_ELD),
++
+ } audio_format_t;
+ 
+ enum {
+@@ -266,6 +310,64 @@ enum {
+ 
+ typedef uint32_t audio_channel_mask_t;
+ 
++/* Maximum number of channels for all representations */
++#define AUDIO_CHANNEL_COUNT_MAX             30
++
++/* log(2) of maximum number of representations, not part of public API */
++#define AUDIO_CHANNEL_REPRESENTATION_LOG2   2
++
++/* Representations */
++typedef enum {
++    AUDIO_CHANNEL_REPRESENTATION_POSITION    = 0,    // must be zero for compatibility
++    // 1 is reserved for future use
++    AUDIO_CHANNEL_REPRESENTATION_INDEX       = 2,
++    // 3 is reserved for future use
++} audio_channel_representation_t;
++
++/* The return value is undefined if the channel mask is invalid. */
++static inline uint32_t audio_channel_mask_get_bits(audio_channel_mask_t channel)
++{
++    return channel & ((1 << AUDIO_CHANNEL_COUNT_MAX) - 1);
++}
++
++/* The return value is undefined if the channel mask is invalid. */
++static inline audio_channel_representation_t audio_channel_mask_get_representation(
++        audio_channel_mask_t channel)
++{
++    // The right shift should be sufficient, but also "and" for safety in case mask is not 32 bits
++    return (audio_channel_representation_t)
++            ((channel >> AUDIO_CHANNEL_COUNT_MAX) & ((1 << AUDIO_CHANNEL_REPRESENTATION_LOG2) - 1));
++}
++
++/* Returns true if the channel mask is valid,
++ * or returns false for AUDIO_CHANNEL_NONE, AUDIO_CHANNEL_INVALID, and other invalid values.
++ * This function is unable to determine whether a channel mask for position assignment
++ * is invalid because an output mask has an invalid output bit set,
++ * or because an input mask has an invalid input bit set.
++ * All other APIs that take a channel mask assume that it is valid.
++ */
++static inline bool audio_channel_mask_is_valid(audio_channel_mask_t channel)
++{
++    uint32_t bits = audio_channel_mask_get_bits(channel);
++    audio_channel_representation_t representation = audio_channel_mask_get_representation(channel);
++    switch (representation) {
++    case AUDIO_CHANNEL_REPRESENTATION_POSITION:
++    case AUDIO_CHANNEL_REPRESENTATION_INDEX:
++        break;
++    default:
++        bits = 0;
++        break;
++    }
++    return bits != 0;
++}
++
++/* Not part of public API */
++static inline audio_channel_mask_t audio_channel_mask_from_representation_and_bits(
++        audio_channel_representation_t representation, uint32_t bits)
++{
++    return (audio_channel_mask_t) ((representation << AUDIO_CHANNEL_COUNT_MAX) | bits);
++}
++
+ typedef enum {
+     AUDIO_MODE_INVALID          = -2,
+     AUDIO_MODE_CURRENT          = -1,
+@@ -512,6 +614,28 @@ static inline bool audio_is_output_channel(audio_channel_mask_t channel)
+         return false;
+ }
+ 
++/* Returns the number of channels from an input channel mask,
++ * used in the context of audio input or recording.
++ * If a channel bit is set which could _not_ correspond to an input channel,
++ * it is excluded from the count.
++ * Returns zero if the representation is invalid.
++ */
++static inline uint32_t audio_channel_count_from_in_mask(audio_channel_mask_t channel)
++{
++    uint32_t bits = audio_channel_mask_get_bits(channel);
++    switch (audio_channel_mask_get_representation(channel)) {
++    case AUDIO_CHANNEL_REPRESENTATION_POSITION:
++        // TODO: We can now merge with from_out_mask and remove anding
++        bits &= AUDIO_CHANNEL_IN_ALL;
++        // fall through
++    case AUDIO_CHANNEL_REPRESENTATION_INDEX:
++        return popcount(bits);
++    default:
++        return 0;
++    }
++}
++
++
+ /* Derive an output channel mask from a channel count.
+  * This is to be used when the content channel mask is unknown. The 1, 2, 4, 5, 6, 7 and 8 channel
+  * cases are mapped to the standard game/home-theater layouts, but note that 4 is mapped to quad,

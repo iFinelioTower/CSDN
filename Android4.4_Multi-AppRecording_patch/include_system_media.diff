@@ -1,0 +1,61 @@
+diff --git a/audio_utils/include/audio_utils/primitives.h b/audio_utils/include/audio_utils/primitives.h
+old mode 100644
+new mode 100755
+index 358563f..e06d6aa
+--- a/audio_utils/include/audio_utils/primitives.h
++++ b/audio_utils/include/audio_utils/primitives.h
+@@ -101,6 +101,54 @@ void downmix_to_mono_i16_from_stereo_i16(int16_t *dst, const int16_t *src, size_
+  */
+ void upmix_to_stereo_i16_from_mono_i16(int16_t *dst, const int16_t *src, size_t count);
+ 
++
++/* Convert a single-precision floating point value to a U4.28 integer value.
++ * Rounds to nearest, ties away from 0.
++ *
++ * Values outside the range [0, 16.0] are properly clamped to [0, 4294967295]
++ * including -Inf and +Inf. NaN values are considered undefined, and behavior may change
++ * depending on hardware and future implementation of this function.
++ */
++static inline uint32_t u4_28_from_float(float f)
++{
++    static const float scale = (float)(1 << 28);
++    static const float limpos = 0xffffffffUL / scale;
++
++    if (f <= 0.) {
++        return 0;
++    } else if (f >= limpos) {
++        return 0xffffffff;
++    }
++    /* integer conversion is through truncation (though int to float is not).
++     * ensure that we round to nearest, ties away from 0.
++     */
++    return f * scale + 0.5;
++}
++
++/* Convert a single-precision floating point value to a U4.12 integer value.
++ * Rounds to nearest, ties away from 0.
++ *
++ * Values outside the range [0, 16.0) are properly clamped to [0, 65535]
++ * including -Inf and +Inf. NaN values are considered undefined, and behavior may change
++ * depending on hardware and future implementation of this function.
++ */
++static inline uint16_t u4_12_from_float(float f)
++{
++    static const float scale = (float)(1 << 12);
++    static const float limpos = 0xffff / scale;
++
++    if (f <= 0.) {
++        return 0;
++    } else if (f >= limpos) {
++        return 0xffff;
++    }
++    /* integer conversion is through truncation (though int to float is not).
++     * ensure that we round to nearest, ties away from 0.
++     */
++    return f * scale + 0.5;
++}
++
++
+ /**
+  * Clamp (aka hard limit or clip) a signed 32-bit sample to 16-bit range.
+  */

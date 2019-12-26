@@ -1,0 +1,104 @@
+diff --git a/AudioPolicyManagerBase.cpp b/AudioPolicyManagerBase.cpp
+index cba5eb4..247fe20 100755
+--- a/AudioPolicyManagerBase.cpp
++++ b/AudioPolicyManagerBase.cpp
+@@ -1055,6 +1055,19 @@ audio_io_handle_t AudioPolicyManagerBase::getInput(int inputSource,
+         return 0;
+     }
+ 
++#ifdef ANDROID4_4_SUPPORT_MULIT_CHANNEL_RECORDING
++		// Modify Tower 20181103: check wether have an AudioInputDescriptor Use the same profile
++		for (size_t input_index = 0; input_index < mInputs.size(); input_index++) {
++			// desc;
++			AudioInputDescriptor * const desc = mInputs.valueAt(input_index);
++			if (desc->mProfile == profile) {
++				desc->mRefCount++;
++				ALOGE("desc->mRefCount: %d, desc->mIoHandle: %d", desc->mRefCount, desc->mIoHandle);
++				return desc->mIoHandle;
++			} 
++		}
++#endif
++
+     AudioInputDescriptor *inputDesc = new AudioInputDescriptor(profile);
+ 
+     inputDesc->mInputSource = inputSource;
+@@ -1064,6 +1077,7 @@ audio_io_handle_t AudioPolicyManagerBase::getInput(int inputSource,
+     inputDesc->mFormat = (audio_format_t)format;
+     inputDesc->mChannelMask = (audio_channel_mask_t)channelMask;
+     inputDesc->mRefCount = 0;
++	
+     input = mpClientInterface->openInput(profile->mModule->mHandle,
+                                     &inputDesc->mDevice,
+                                     &inputDesc->mSamplingRate,
+@@ -1083,6 +1097,12 @@ audio_io_handle_t AudioPolicyManagerBase::getInput(int inputSource,
+         delete inputDesc;
+         return 0;
+     }
++		
++#ifdef ANDROID4_4_SUPPORT_MULIT_CHANNEL_RECORDING
++	ALOGE("setIoHandle: %d", input);
++	inputDesc->setIoHandle(input); 
++#endif
++
+     mInputs.add(input, inputDesc);
+     return input;
+ }
+@@ -1103,7 +1123,8 @@ status_t AudioPolicyManagerBase::startInput(audio_io_handle_t input)
+     {
+         // refuse 2 active AudioRecord clients at the same time
+         audio_io_handle_t activeInput = getActiveInput();
+-        if (!isVirtualInputDevice(inputDesc->mDevice) && activeInput != 0) {
++		// Modify Tower 20191224, if audio_io_handle_t some like. pass INVALID_OPERATION.
++        if (!isVirtualInputDevice(inputDesc->mDevice) && activeInput != 0 && activeInput != input) {
+             AudioInputDescriptor *activeDesc = mInputs.valueFor(activeInput);
+             if (activeDesc->mInputSource == AUDIO_SOURCE_HOTWORD) {
+                 ALOGW("startInput() preempting already started low-priority input %d", activeInput);
+@@ -1202,7 +1223,7 @@ status_t AudioPolicyManagerBase::startInput(audio_io_handle_t input)
+ 
+     mpClientInterface->setParameters(input, param.toString());
+ 
+-    inputDesc->mRefCount = 1;
++    inputDesc->mRefCount++;
+     return NO_ERROR;
+ }
+ 
+@@ -1219,7 +1240,10 @@ status_t AudioPolicyManagerBase::stopInput(audio_io_handle_t input)
+     if (inputDesc->mRefCount == 0) {
+         ALOGW("stopInput() input %d already stopped", input);
+         return INVALID_OPERATION;
+-    } else {
++    } 
++
++	inputDesc->mRefCount--;
++	if (inputDesc->mRefCount == 0) {
+         // automatically disable the remote submix output when input is stopped
+         if (audio_is_remote_submix_device(inputDesc->mDevice)) {
+             setDeviceConnectionState(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
+@@ -1228,9 +1252,9 @@ status_t AudioPolicyManagerBase::stopInput(audio_io_handle_t input)
+         AudioParameter param = AudioParameter();
+         param.addInt(String8(AudioParameter::keyRouting), 0);
+         mpClientInterface->setParameters(input, param.toString());
+-        inputDesc->mRefCount = 0;
+-        return NO_ERROR;
+     }
++	
++	return NO_ERROR;
+ }
+ 
+ void AudioPolicyManagerBase::releaseInput(audio_io_handle_t input)
+@@ -3650,8 +3674,14 @@ status_t AudioPolicyManagerBase::AudioInputDescriptor::dump(int fd)
+     return NO_ERROR;
+ }
+ 
+-// --- StreamDescriptor class implementation
++#ifdef ANDROID4_4_SUPPORT_MULIT_CHANNEL_RECORDING
++void AudioPolicyManagerBase::AudioInputDescriptor::setIoHandle(audio_io_handle_t ioHandle)
++{
++    mIoHandle = ioHandle;
++}
++#endif
+ 
++// --- StreamDescriptor class implementation
+ AudioPolicyManagerBase::StreamDescriptor::StreamDescriptor()
+     :   mIndexMin(0), mIndexMax(1), mCanBeMuted(true)
+ {
