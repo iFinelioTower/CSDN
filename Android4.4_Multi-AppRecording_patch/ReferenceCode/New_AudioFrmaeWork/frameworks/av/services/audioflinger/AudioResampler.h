@@ -49,6 +49,9 @@ public:
 
     static const float UNITY_GAIN_FLOAT = 1.0f;
 
+	static AudioResampler* create(int bitDepth, int inChannelCount,
+            int32_t sampleRate, src_quality quality=DEFAULT_QUALITY);
+	
     static AudioResampler* create(audio_format_t format, int inChannelCount,
             int32_t sampleRate, src_quality quality=DEFAULT_QUALITY);
 

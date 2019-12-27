@@ -174,13 +174,7 @@ private:
         uint16_t    frameCount;
 
         uint8_t     channelCount;   // 1 or 2, redundant with (needs & NEEDS_CHANNEL_COUNT__MASK)
-
-		// 16-byte boundary
-        audio_format_t mMixerFormat;     // output mix format: AUDIO_FORMAT_PCM_(FLOAT|16_BIT)
-        uint8_t mFormat;          // input track format, always 16
-        audio_format_t     mMixerInFormat;  // mix internal format AUDIO_FORMAT_PCM_(FLOAT|16_BIT)
-                                            // each track must be converted to this format.     
-        
+        uint8_t     format;         // always 16
         uint16_t    enabled;        // actually bool
         audio_channel_mask_t channelMask;
 

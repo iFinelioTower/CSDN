@@ -146,6 +146,15 @@ static const uint32_t maxMHz = 130; // an arbitrary number that permits 3 VHQ, s
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static uint32_t currentMHz = 0;
 
+AudioResampler* AudioResampler::create(int bitDepth, int inChannelCount,
+            int32_t sampleRate, src_quality quality) {
+
+	audio_format_t format = 
+		(bitDepth == 16) ? AUDIO_FORMAT_PCM_16_BIT : AUDIO_FORMAT_PCM_FLOAT;
+	
+    return AudioResampler::create(format, inChannelCount, sampleRate, quality);
+}
+
 AudioResampler* AudioResampler::create(audio_format_t format, int inChannelCount,
         int32_t sampleRate, src_quality quality) {
 

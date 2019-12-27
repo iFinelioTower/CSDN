@@ -41,15 +41,6 @@
 
 #include "AudioMixer.h"
 
-// Set kUseNewMixer to true to use the new mixer engine. Otherwise the
-// original code will be used.  This is false for now.
-static const bool kUseNewMixer = false;
-
-// Set kUseFloat to true to allow floating input into the mixer engine.
-// If kUseNewMixer is false, this is ignored or may be overridden internally
-// because of downmix/upmix support.
-static const bool kUseFloat = true;
-
 namespace android {
 
 // ----------------------------------------------------------------------------
@@ -209,12 +200,7 @@ int AudioMixer::getTrackName(audio_channel_mask_t channelMask, int sessionId)
         // t->frameCount
         t->channelCount = 2;
         t->enabled = false;
-		
-        t->mMixerFormat = AUDIO_FORMAT_PCM_16_BIT;
-        t->mFormat = 16;
-		t->mMixerInFormat = kUseFloat && kUseNewMixer
-                ? AUDIO_FORMAT_PCM_FLOAT : AUDIO_FORMAT_PCM_16_BIT;
-		
+        t->format = 16;
         t->channelMask = AUDIO_CHANNEL_OUT_STEREO;
         t->sessionId = sessionId;
         // setBufferProvider(name, AudioBufferProvider *) is required before enable(name)
@@ -577,19 +563,11 @@ bool AudioMixer::track_t::setResampler(uint32_t value, uint32_t devSampleRate)
                 } else {
                     quality = AudioResampler::DEFAULT_QUALITY;
                 }
-#if 0
                 resampler = AudioResampler::create(
                         format,
                         // the resampler sees the number of channels after the downmixer, if any
                         downmixerBufferProvider != NULL ? MAX_NUM_CHANNELS : channelCount,
                         devSampleRate, quality);
-#else
-                resampler = AudioResampler::create(
-                        mMixerInFormat,
-                        // the resampler sees the number of channels after the downmixer, if any
-                        downmixerBufferProvider != NULL ? MAX_NUM_CHANNELS : channelCount,
-                        devSampleRate, quality);
-#endif
                 resampler->setLocalTimeFreq(sLocalTimeFreq);
             }
             return true;

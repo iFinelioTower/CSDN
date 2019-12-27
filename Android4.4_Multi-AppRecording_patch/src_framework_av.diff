@@ -1,3 +1,30 @@
+diff --git a/libvideoeditor/lvpp/Android.mk b/libvideoeditor/lvpp/Android.mk
+index 2286827..b1c0276 100755
+--- a/libvideoeditor/lvpp/Android.mk
++++ b/libvideoeditor/lvpp/Android.mk
+@@ -63,7 +63,7 @@ LOCAL_SHARED_LIBRARIES :=     \
+     libui                     \
+     libutils                  \
+     libvideoeditor_osal       \
+-
++    libaudioresampler
+ 
+ LOCAL_C_INCLUDES += \
+     $(TOP)/system/media/audio_utils/include \
+diff --git a/libvideoeditor/vss/src/Android.mk b/libvideoeditor/vss/src/Android.mk
+index f400921..2d1a572 100755
+--- a/libvideoeditor/vss/src/Android.mk
++++ b/libvideoeditor/vss/src/Android.mk
+@@ -66,7 +66,8 @@ LOCAL_SHARED_LIBRARIES :=       \
+     libvideoeditor_osal         \
+     libvideoeditor_videofilters \
+     libvideoeditorplayer        \
+-    libvpu
++    libvpu                      \
++    libaudioresampler
+ 
+ LOCAL_STATIC_LIBRARIES := \
+     libstagefright_color_conversion \
 diff --git a/services/audioflinger/Android.mk b/services/audioflinger/Android.mk
 old mode 100644
 new mode 100755
@@ -118,66 +145,10 @@ index 53e238e..eff09f2
  
  private:
      class AudioHwDevice;    // fwd declaration for findSuitableHwDev_l
-diff --git a/services/audioflinger/AudioMixer.cpp b/services/audioflinger/AudioMixer.cpp
-old mode 100644
-new mode 100755
-index 07dc6dd..d977ece
---- a/services/audioflinger/AudioMixer.cpp
-+++ b/services/audioflinger/AudioMixer.cpp
-@@ -41,6 +41,15 @@
- 
- #include "AudioMixer.h"
- 
-+// Set kUseNewMixer to true to use the new mixer engine. Otherwise the
-+// original code will be used.  This is false for now.
-+static const bool kUseNewMixer = false;
-+
-+// Set kUseFloat to true to allow floating input into the mixer engine.
-+// If kUseNewMixer is false, this is ignored or may be overridden internally
-+// because of downmix/upmix support.
-+static const bool kUseFloat = true;
-+
- namespace android {
- 
- // ----------------------------------------------------------------------------
-@@ -200,7 +209,12 @@ int AudioMixer::getTrackName(audio_channel_mask_t channelMask, int sessionId)
-         // t->frameCount
-         t->channelCount = 2;
-         t->enabled = false;
--        t->format = 16;
-+		
-+        t->mMixerFormat = AUDIO_FORMAT_PCM_16_BIT;
-+        t->mFormat = 16;
-+		t->mMixerInFormat = kUseFloat && kUseNewMixer
-+                ? AUDIO_FORMAT_PCM_FLOAT : AUDIO_FORMAT_PCM_16_BIT;
-+		
-         t->channelMask = AUDIO_CHANNEL_OUT_STEREO;
-         t->sessionId = sessionId;
-         // setBufferProvider(name, AudioBufferProvider *) is required before enable(name)
-@@ -563,11 +577,19 @@ bool AudioMixer::track_t::setResampler(uint32_t value, uint32_t devSampleRate)
-                 } else {
-                     quality = AudioResampler::DEFAULT_QUALITY;
-                 }
-+#if 0
-                 resampler = AudioResampler::create(
-                         format,
-                         // the resampler sees the number of channels after the downmixer, if any
-                         downmixerBufferProvider != NULL ? MAX_NUM_CHANNELS : channelCount,
-                         devSampleRate, quality);
-+#else
-+                resampler = AudioResampler::create(
-+                        mMixerInFormat,
-+                        // the resampler sees the number of channels after the downmixer, if any
-+                        downmixerBufferProvider != NULL ? MAX_NUM_CHANNELS : channelCount,
-+                        devSampleRate, quality);
-+#endif
-                 resampler->setLocalTimeFreq(sLocalTimeFreq);
-             }
-             return true;
 diff --git a/services/audioflinger/AudioMixer.h b/services/audioflinger/AudioMixer.h
 old mode 100644
 new mode 100755
-index 43aeb86..db08e35
+index 43aeb86..985dcb5
 --- a/services/audioflinger/AudioMixer.h
 +++ b/services/audioflinger/AudioMixer.h
 @@ -56,7 +56,8 @@ public:
@@ -190,25 +161,10 @@ index 43aeb86..db08e35
      enum { // names
  
          // track names (MAX_NUM_TRACKS units)
-@@ -173,7 +174,13 @@ private:
-         uint16_t    frameCount;
- 
-         uint8_t     channelCount;   // 1 or 2, redundant with (needs & NEEDS_CHANNEL_COUNT__MASK)
--        uint8_t     format;         // always 16
-+
-+		// 16-byte boundary
-+        audio_format_t mMixerFormat;     // output mix format: AUDIO_FORMAT_PCM_(FLOAT|16_BIT)
-+        uint8_t mFormat;          // input track format, always 16
-+        audio_format_t     mMixerInFormat;  // mix internal format AUDIO_FORMAT_PCM_(FLOAT|16_BIT)
-+                                            // each track must be converted to this format.     
-+        
-         uint16_t    enabled;        // actually bool
-         audio_channel_mask_t channelMask;
- 
 diff --git a/services/audioflinger/AudioResampler.cpp b/services/audioflinger/AudioResampler.cpp
 old mode 100644
 new mode 100755
-index 2c3c719..1f7a613
+index 2c3c719..316b868
 --- a/services/audioflinger/AudioResampler.cpp
 +++ b/services/audioflinger/AudioResampler.cpp
 @@ -22,9 +22,11 @@
@@ -276,16 +232,23 @@ index 2c3c719..1f7a613
      }
  }
  
-@@ -132,7 +146,7 @@ static const uint32_t maxMHz = 130; // an arbitrary number that permits 3 VHQ, s
- static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+@@ -133,6 +147,15 @@ static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
  static uint32_t currentMHz = 0;
  
--AudioResampler* AudioResampler::create(int bitDepth, int inChannelCount,
+ AudioResampler* AudioResampler::create(int bitDepth, int inChannelCount,
++            int32_t sampleRate, src_quality quality) {
++
++	audio_format_t format = 
++		(bitDepth == 16) ? AUDIO_FORMAT_PCM_16_BIT : AUDIO_FORMAT_PCM_FLOAT;
++	
++    return AudioResampler::create(format, inChannelCount, sampleRate, quality);
++}
++
 +AudioResampler* AudioResampler::create(audio_format_t format, int inChannelCount,
          int32_t sampleRate, src_quality quality) {
  
      bool atFinalQuality;
-@@ -148,6 +162,16 @@ AudioResampler* AudioResampler::create(int bitDepth, int inChannelCount,
+@@ -148,6 +171,16 @@ AudioResampler* AudioResampler::create(int bitDepth, int inChannelCount,
          atFinalQuality = true;
      }
  
@@ -302,7 +265,7 @@ index 2c3c719..1f7a613
      // naive implementation of CPU load throttling doesn't account for whether resampler is active
      pthread_mutex_lock(&mutex);
      for (;;) {
-@@ -162,7 +186,6 @@ AudioResampler* AudioResampler::create(int bitDepth, int inChannelCount,
+@@ -162,7 +195,6 @@ AudioResampler* AudioResampler::create(int bitDepth, int inChannelCount,
          // not enough CPU available for proposed quality level, so try next lowest level
          switch (quality) {
          default:
@@ -310,7 +273,7 @@ index 2c3c719..1f7a613
          case LOW_QUALITY:
              atFinalQuality = true;
              break;
-@@ -175,6 +198,15 @@ AudioResampler* AudioResampler::create(int bitDepth, int inChannelCount,
+@@ -175,6 +207,15 @@ AudioResampler* AudioResampler::create(int bitDepth, int inChannelCount,
          case VERY_HIGH_QUALITY:
              quality = HIGH_QUALITY;
              break;
@@ -326,7 +289,7 @@ index 2c3c719..1f7a613
          }
      }
      pthread_mutex_unlock(&mutex);
-@@ -183,22 +215,43 @@ AudioResampler* AudioResampler::create(int bitDepth, int inChannelCount,
+@@ -183,22 +224,43 @@ AudioResampler* AudioResampler::create(int bitDepth, int inChannelCount,
  
      switch (quality) {
      default:
@@ -375,7 +338,7 @@ index 2c3c719..1f7a613
          break;
      }
  
-@@ -207,26 +260,26 @@ AudioResampler* AudioResampler::create(int bitDepth, int inChannelCount,
+@@ -207,26 +269,26 @@ AudioResampler* AudioResampler::create(int bitDepth, int inChannelCount,
      return resampler;
  }
  
@@ -414,7 +377,7 @@ index 2c3c719..1f7a613
  }
  
  AudioResampler::~AudioResampler() {
-@@ -246,10 +299,12 @@ void AudioResampler::setSampleRate(int32_t inSampleRate) {
+@@ -246,10 +308,12 @@ void AudioResampler::setSampleRate(int32_t inSampleRate) {
      mPhaseIncrement = (uint32_t)((kPhaseMultiplier * inSampleRate) / mSampleRate);
  }
  
@@ -430,7 +393,7 @@ index 2c3c719..1f7a613
  }
  
  void AudioResampler::setLocalTimeFreq(uint64_t freq) {
-@@ -305,7 +360,7 @@ void AudioResamplerOrder1::resampleStereo16(int32_t* out, size_t outFrameCount,
+@@ -305,7 +369,7 @@ void AudioResamplerOrder1::resampleStereo16(int32_t* out, size_t outFrameCount,
      uint32_t phaseIncrement = mPhaseIncrement;
      size_t outputIndex = 0;
      size_t outputSampleCount = outFrameCount * 2;
@@ -439,7 +402,7 @@ index 2c3c719..1f7a613
  
      // ALOGE("starting resample %d frames, inputIndex=%d, phaseFraction=%d, phaseIncrement=%d",
      //      outFrameCount, inputIndex, phaseFraction, phaseIncrement);
-@@ -339,8 +394,9 @@ void AudioResamplerOrder1::resampleStereo16(int32_t* out, size_t outFrameCount,
+@@ -339,8 +403,9 @@ void AudioResamplerOrder1::resampleStereo16(int32_t* out, size_t outFrameCount,
              out[outputIndex++] += vl * Interp(mX0L, in[0], phaseFraction);
              out[outputIndex++] += vr * Interp(mX0R, in[1], phaseFraction);
              Advance(&inputIndex, &phaseFraction, phaseIncrement);
@@ -450,7 +413,7 @@ index 2c3c719..1f7a613
          }
  
          // process input samples
-@@ -402,7 +458,7 @@ void AudioResamplerOrder1::resampleMono16(int32_t* out, size_t outFrameCount,
+@@ -402,7 +467,7 @@ void AudioResamplerOrder1::resampleMono16(int32_t* out, size_t outFrameCount,
      uint32_t phaseIncrement = mPhaseIncrement;
      size_t outputIndex = 0;
      size_t outputSampleCount = outFrameCount * 2;
@@ -459,7 +422,7 @@ index 2c3c719..1f7a613
  
      // ALOGE("starting resample %d frames, inputIndex=%d, phaseFraction=%d, phaseIncrement=%d",
      //      outFrameCount, inputIndex, phaseFraction, phaseIncrement);
-@@ -434,8 +490,9 @@ void AudioResamplerOrder1::resampleMono16(int32_t* out, size_t outFrameCount,
+@@ -434,8 +499,9 @@ void AudioResamplerOrder1::resampleMono16(int32_t* out, size_t outFrameCount,
              out[outputIndex++] += vl * sample;
              out[outputIndex++] += vr * sample;
              Advance(&inputIndex, &phaseFraction, phaseIncrement);
@@ -470,7 +433,7 @@ index 2c3c719..1f7a613
          }
  
          // process input samples
-@@ -514,6 +571,16 @@ void AudioResamplerOrder1::AsmMono16Loop(int16_t *in, int32_t* maxOutPt, int32_t
+@@ -514,6 +580,16 @@ void AudioResamplerOrder1::AsmMono16Loop(int16_t *in, int32_t* maxOutPt, int32_t
              size_t &outputIndex, int32_t* out, size_t &inputIndex, int32_t vl, int32_t vr,
              uint32_t &phaseFraction, uint32_t phaseIncrement)
  {
@@ -487,7 +450,7 @@ index 2c3c719..1f7a613
  #define MO_PARAM5   "36"        // offset of parameter 5 (outputIndex)
  
      asm(
-@@ -526,7 +593,7 @@ void AudioResamplerOrder1::AsmMono16Loop(int16_t *in, int32_t* maxOutPt, int32_t
+@@ -526,7 +602,7 @@ void AudioResamplerOrder1::AsmMono16Loop(int16_t *in, int32_t* maxOutPt, int32_t
          "   ldr r8, [sp, #" MO_PARAM5 " + 4]\n"     // out
          "   ldr r0, [sp, #" MO_PARAM5 " + 0]\n"     // &outputIndex
          "   ldr r0, [r0]\n"                         // outputIndex
@@ -496,7 +459,7 @@ index 2c3c719..1f7a613
          "   ldr r9, [sp, #" MO_PARAM5 " + 24]\n"    // phaseIncrement
          "   ldr r10, [sp, #" MO_PARAM5 " + 12]\n"   // vl
          "   ldr r11, [sp, #" MO_PARAM5 " + 16]\n"   // vr
-@@ -625,6 +692,16 @@ void AudioResamplerOrder1::AsmStereo16Loop(int16_t *in, int32_t* maxOutPt, int32
+@@ -625,6 +701,16 @@ void AudioResamplerOrder1::AsmStereo16Loop(int16_t *in, int32_t* maxOutPt, int32
              size_t &outputIndex, int32_t* out, size_t &inputIndex, int32_t vl, int32_t vr,
              uint32_t &phaseFraction, uint32_t phaseIncrement)
  {
@@ -513,7 +476,7 @@ index 2c3c719..1f7a613
  #define ST_PARAM5    "40"     // offset of parameter 5 (outputIndex)
      asm(
          "stmfd  sp!, {r4, r5, r6, r7, r8, r9, r10, r11, r12, lr}\n"
-@@ -636,7 +713,7 @@ void AudioResamplerOrder1::AsmStereo16Loop(int16_t *in, int32_t* maxOutPt, int32
+@@ -636,7 +722,7 @@ void AudioResamplerOrder1::AsmStereo16Loop(int16_t *in, int32_t* maxOutPt, int32
          "   ldr r8, [sp, #" ST_PARAM5 " + 4]\n"     // out
          "   ldr r0, [sp, #" ST_PARAM5 " + 0]\n"     // &outputIndex
          "   ldr r0, [r0]\n"                         // outputIndex
@@ -525,7 +488,7 @@ index 2c3c719..1f7a613
 diff --git a/services/audioflinger/AudioResampler.h b/services/audioflinger/AudioResampler.h
 old mode 100644
 new mode 100755
-index 33e64ce..cdc6d92
+index 33e64ce..7b07195
 --- a/services/audioflinger/AudioResampler.h
 +++ b/services/audioflinger/AudioResampler.h
 @@ -22,6 +22,7 @@
@@ -536,7 +499,7 @@ index 33e64ce..cdc6d92
  
  namespace android {
  // ----------------------------------------------------------------------------
-@@ -41,16 +42,21 @@ public:
+@@ -41,16 +42,24 @@ public:
          MED_QUALITY=2,
          HIGH_QUALITY=3,
          VERY_HIGH_QUALITY=4,
@@ -548,6 +511,9 @@ index 33e64ce..cdc6d92
 -    static AudioResampler* create(int bitDepth, int inChannelCount,
 +    static const float UNITY_GAIN_FLOAT = 1.0f;
 +
++	static AudioResampler* create(int bitDepth, int inChannelCount,
++            int32_t sampleRate, src_quality quality=DEFAULT_QUALITY);
++	
 +    static AudioResampler* create(audio_format_t format, int inChannelCount,
              int32_t sampleRate, src_quality quality=DEFAULT_QUALITY);
  
@@ -560,7 +526,7 @@ index 33e64ce..cdc6d92
      virtual void setLocalTimeFreq(uint64_t freq);
  
      // set the PTS of the next buffer output by the resampler
-@@ -60,7 +66,7 @@ public:
+@@ -60,7 +69,7 @@ public:
      // A mono provider delivers a sequence of samples.
      // A stereo provider delivers a sequence of interleaved pairs of samples.
      // Multi-channel providers are not supported.
@@ -569,7 +535,7 @@ index 33e64ce..cdc6d92
      // That is, for a mono provider, there is an implicit up-channeling.
      // Since this method accumulates, the caller is responsible for clearing 'out' initially.
      // FIXME assumes provider is always successful; it should return the actual frame count.
-@@ -81,9 +87,9 @@ protected:
+@@ -81,9 +90,9 @@ protected:
      static const uint32_t kPhaseMask = (1LU<<kNumPhaseBits)-1;
  
      // multiplier to calculate fixed point phase increment
@@ -581,7 +547,7 @@ index 33e64ce..cdc6d92
  
      // prevent copying
      AudioResampler(const AudioResampler&);
-@@ -91,7 +97,6 @@ protected:
+@@ -91,7 +100,6 @@ protected:
  
      int64_t calculateOutputPTS(int outputFrameIndex);
  
@@ -589,7 +555,7 @@ index 33e64ce..cdc6d92
      const int32_t mChannelCount;
      const int32_t mSampleRate;
      int32_t mInSampleRate;
-@@ -107,6 +112,47 @@ protected:
+@@ -107,6 +115,47 @@ protected:
      uint64_t mLocalTimeFreq;
      int64_t mPTS;
  
@@ -4412,7 +4378,7 @@ index 57de568..a10d77a
 +    ResamplerBufferProvider *mResamplerBufferProvider;
  };
 diff --git a/services/audioflinger/Threads.cpp b/services/audioflinger/Threads.cpp
-index 03139d0..c3d2f99 100755
+index 03139d0..dcdebbd 100755
 --- a/services/audioflinger/Threads.cpp
 +++ b/services/audioflinger/Threads.cpp
 @@ -16,7 +16,7 @@
@@ -4424,61 +4390,88 @@ index 03139d0..c3d2f99 100755
  //#define LOG_NDEBUG 0
  #define ATRACE_TAG ATRACE_TAG_AUDIO
  
-@@ -369,14 +369,14 @@ void AudioFlinger::ThreadBase::sendPrioConfigEvent_l(pid_t pid, pid_t tid, int32
+@@ -265,7 +265,7 @@ void CpuStats::sample(const String8 &title) {
+ // ----------------------------------------------------------------------------
+ 
+ AudioFlinger::ThreadBase::ThreadBase(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
+-        audio_devices_t outDevice, audio_devices_t inDevice, type_t type)
++        audio_devices_t outDevice, audio_devices_t inDevice, type_t type, bool configLock)
+     :   Thread(false /*canCallJava*/),
+         mType(type),
+         mAudioFlinger(audioFlinger),
+@@ -276,7 +276,8 @@ AudioFlinger::ThreadBase::ThreadBase(const sp<AudioFlinger>& audioFlinger, audio
+         mStandby(false), mOutDevice(outDevice), mInDevice(inDevice),
+         mAudioSource(AUDIO_SOURCE_DEFAULT), mId(id),
+         // mName will be set by concrete (non-virtual) subclass
+-        mDeathRecipient(new PMDeathRecipient(this))
++        mDeathRecipient(new PMDeathRecipient(this)),
++        mConfigLock(configLock)
+ {
+ }
+ 
+@@ -369,14 +370,18 @@ void AudioFlinger::ThreadBase::sendPrioConfigEvent_l(pid_t pid, pid_t tid, int32
  
  void AudioFlinger::ThreadBase::processConfigEvents()
  {
 -    mLock.lock();
-+    //mLock.lock();
-     while (!mConfigEvents.isEmpty()) {
+-    while (!mConfigEvents.isEmpty()) {
++    if (mConfigLock)
++		mLock.lock();
++
++	while (!mConfigEvents.isEmpty()) {
          ALOGV("processConfigEvents() remaining events %d", mConfigEvents.size());
          ConfigEvent *event = mConfigEvents[0];
          mConfigEvents.removeAt(0);
          // release mLock before locking AudioFlinger mLock: lock order is always
          // AudioFlinger then ThreadBase to avoid cross deadlock
 -        mLock.unlock();
-+        //mLock.unlock();
++        if (mConfigLock)
++			mLock.unlock();
++		
          switch(event->type()) {
              case CFG_EVENT_PRIO: {
                  PrioConfigEvent *prioEvent = static_cast<PrioConfigEvent *>(event);
-@@ -399,10 +399,11 @@ void AudioFlinger::ThreadBase::processConfigEvents()
+@@ -399,10 +404,15 @@ void AudioFlinger::ThreadBase::processConfigEvents()
                  ALOGE("processConfigEvents() unknown event type %d", event->type());
                  break;
          }
 +		
          delete event;
 -        mLock.lock();
-+        //mLock.lock();
++		
++        if (mConfigLock)
++			mLock.lock();
      }
 -    mLock.unlock();
-+    //mLock.unlock();
++	
++    if (mConfigLock)
++		mLock.unlock();
  }
  
  void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args)
-@@ -4378,7 +4379,7 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
+@@ -4377,8 +4387,8 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
+                                          , const sp<NBAIO_Sink>& teeSink
  #endif
                                           ) :
-     ThreadBase(audioFlinger, id, outDevice, inDevice, RECORD),
+-    ThreadBase(audioFlinger, id, outDevice, inDevice, RECORD),
 -    mInput(input), mResampler(NULL), mRsmpOutBuffer(NULL), mRsmpInBuffer(NULL),
-+    mInput(input), mRsmpInBuffer(NULL),
++    ThreadBase(audioFlinger, id, outDevice, inDevice, RECORD, false /* ThreadBase::mConfigLock */),
++    mInput(input), mActiveTracksGen(0), mRsmpInRear(0), mRsmpInBuffer(NULL),
      // mRsmpInIndex and mBufferSize set by readInputParameters()
      mReqChannelCount(popcount(channelMask)),
      mReqSampleRate(sampleRate)
-@@ -4387,9 +4388,12 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
+@@ -4387,9 +4397,9 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
  #ifdef TEE_SINK
      , mTeeSink(teeSink)
  #endif
 +    , mFastTrackAvail(false)
  {
-+	mActiveTracksGen = 0;
-+	mRsmpInRear = 0;
-+	
      snprintf(mName, kNameLength, "AudioIn_%X", id);
 -
      readInputParameters();
  }
  
-@@ -4397,8 +4401,6 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
+@@ -4397,8 +4407,6 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
  AudioFlinger::RecordThread::~RecordThread()
  {
      delete[] mRsmpInBuffer;
@@ -4487,7 +4480,7 @@ index 03139d0..c3d2f99 100755
  }
  
  void AudioFlinger::RecordThread::onFirstRef()
-@@ -4415,232 +4417,421 @@ status_t AudioFlinger::RecordThread::readyToRun()
+@@ -4415,232 +4423,421 @@ status_t AudioFlinger::RecordThread::readyToRun()
  
  bool AudioFlinger::RecordThread::threadLoop()
  {
@@ -5062,7 +5055,7 @@ index 03139d0..c3d2f99 100755
          mStartStopCond.broadcast();
      }
  
-@@ -4781,65 +4972,88 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
+@@ -4781,65 +4978,88 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
      status_t status = NO_ERROR;
  
      if (event == AudioSystem::SYNC_EVENT_NONE) {
@@ -5183,7 +5176,7 @@ index 03139d0..c3d2f99 100755
          ALOGV("Record started OK");
          return status;
      }
-@@ -4864,8 +5078,13 @@ void AudioFlinger::RecordThread::syncStartEventCallback(const wp<SyncEvent>& eve
+@@ -4864,8 +5084,13 @@ void AudioFlinger::RecordThread::syncStartEventCallback(const wp<SyncEvent>& eve
      sp<SyncEvent> strongEvent = event.promote();
  
      if (strongEvent != 0) {
@@ -5199,7 +5192,7 @@ index 03139d0..c3d2f99 100755
      }
  }
  
-@@ -4881,7 +5100,7 @@ void AudioFlinger::RecordThread::handleSyncStartEvent(const sp<SyncEvent>& event
+@@ -4881,7 +5106,7 @@ void AudioFlinger::RecordThread::handleSyncStartEvent(const sp<SyncEvent>& event
  bool AudioFlinger::RecordThread::stop(RecordThread::RecordTrack* recordTrack) {
      ALOGV("RecordThread::stop");
      AutoMutex _l(mLock);
@@ -5208,7 +5201,7 @@ index 03139d0..c3d2f99 100755
          return false;
      }
      recordTrack->mState = TrackBase::PAUSING;
-@@ -4891,7 +5110,7 @@ bool AudioFlinger::RecordThread::stop(RecordThread::RecordTrack* recordTrack) {
+@@ -4891,7 +5116,7 @@ bool AudioFlinger::RecordThread::stop(RecordThread::RecordTrack* recordTrack) {
      }
      mStartStopCond.wait(mLock);
      // if we have been restarted, recordTrack == mActiveTrack.get() here
@@ -5217,7 +5210,7 @@ index 03139d0..c3d2f99 100755
          ALOGV("Record stopped OK");
          return true;
      }
-@@ -4934,7 +5153,7 @@ void AudioFlinger::RecordThread::destroyTrack_l(const sp<RecordTrack>& track)
+@@ -4934,7 +5159,7 @@ void AudioFlinger::RecordThread::destroyTrack_l(const sp<RecordTrack>& track)
      track->terminate();
      track->mState = TrackBase::STOPPED;
      // active tracks are removed by threadLoop()
@@ -5226,7 +5219,7 @@ index 03139d0..c3d2f99 100755
          removeTrack_l(track);
      }
  }
-@@ -4943,6 +5162,10 @@ void AudioFlinger::RecordThread::removeTrack_l(const sp<RecordTrack>& track)
+@@ -4943,6 +5168,10 @@ void AudioFlinger::RecordThread::removeTrack_l(const sp<RecordTrack>& track)
  {
      mTracks.remove(track);
      // need anything related to effects here?
@@ -5237,7 +5230,7 @@ index 03139d0..c3d2f99 100755
  }
  
  void AudioFlinger::RecordThread::dump(int fd, const Vector<String16>& args)
-@@ -4961,13 +5184,11 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
+@@ -4961,13 +5190,11 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
      snprintf(buffer, SIZE, "\nInput thread %p internals\n", this);
      result.append(buffer);
  
@@ -5252,7 +5245,7 @@ index 03139d0..c3d2f99 100755
          snprintf(buffer, SIZE, "Out channel count: %u\n", mReqChannelCount);
          result.append(buffer);
          snprintf(buffer, SIZE, "Out sample rate: %u\n", mReqSampleRate);
-@@ -4983,75 +5204,111 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
+@@ -4983,75 +5210,111 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
  
  void AudioFlinger::RecordThread::dumpTracks(int fd, const Vector<String16>& args)
  {
@@ -5420,7 +5413,7 @@ index 03139d0..c3d2f99 100755
      buffer->frameCount = 0;
  }
  
-@@ -5088,11 +5345,11 @@ bool AudioFlinger::RecordThread::checkForNewParameters_l()
+@@ -5088,11 +5351,11 @@ bool AudioFlinger::RecordThread::checkForNewParameters_l()
              // do not accept frame count changes if tracks are open as the track buffer
              // size depends on frame count and correct behavior would not be guaranteed
              // if frame count is changed after track creation
@@ -5437,7 +5430,7 @@ index 03139d0..c3d2f99 100755
          }
          if (param.getInt(String8(AudioParameter::keyRouting), value) == NO_ERROR) {
              // forward device change to effects that have requested to be
-@@ -5205,50 +5462,44 @@ void AudioFlinger::RecordThread::audioConfigChanged_l(int event, int param) {
+@@ -5205,50 +5468,44 @@ void AudioFlinger::RecordThread::audioConfigChanged_l(int event, int param) {
  
  void AudioFlinger::RecordThread::readInputParameters()
  {
@@ -5527,10 +5520,30 @@ index 03139d0..c3d2f99 100755
 diff --git a/services/audioflinger/Threads.h b/services/audioflinger/Threads.h
 old mode 100644
 new mode 100755
-index 207f1eb..e72c489
+index 207f1eb..c5b9dfa
 --- a/services/audioflinger/Threads.h
 +++ b/services/audioflinger/Threads.h
-@@ -838,10 +838,25 @@ public:
+@@ -33,7 +33,7 @@ public:
+     };
+ 
+     ThreadBase(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
+-                audio_devices_t outDevice, audio_devices_t inDevice, type_t type);
++                audio_devices_t outDevice, audio_devices_t inDevice, type_t type, bool configLock = true);
+     virtual             ~ThreadBase();
+ 
+     void dumpBase(int fd, const Vector<String16>& args);
+@@ -327,6 +327,10 @@ protected:
+                                         mSuspendedSessions;
+                 static const size_t     kLogSize = 4 * 1024;
+                 sp<NBLog::Writer>       mNBLogWriter;
++
++				// RecordThread exec processConfigEvents not mutex. from Android5.1.
++				// so for thread safety, add lock config choose.
++				bool                    mConfigLock;
+ };
+ 
+ // --- PlaybackThread ---
+@@ -838,10 +842,25 @@ public:
  
  
  // record thread
@@ -5557,7 +5570,7 @@ index 207f1eb..e72c489
  
  #include "RecordTracks.h"
  
-@@ -897,10 +912,6 @@ public:
+@@ -897,10 +916,6 @@ public:
              AudioStreamIn* clearInput();
              virtual audio_stream_t* stream() const;
  
@@ -5568,7 +5581,7 @@ index 207f1eb..e72c489
      virtual bool        checkForNewParameters_l();
      virtual String8     getParameters(const String8& keys);
      virtual void        audioConfigChanged_l(int event, int param = 0);
-@@ -936,21 +947,25 @@ private:
+@@ -936,21 +951,25 @@ private:
  
              AudioStreamIn                       *mInput;
              SortedVector < sp<RecordTrack> >    mTracks;
@@ -5602,7 +5615,7 @@ index 207f1eb..e72c489
              // sync event triggering actual audio capture. Frames read before this event will
              // be dropped and therefore not read by the application.
              sp<SyncEvent>                       mSyncStartEvent;
-@@ -961,4 +976,6 @@ private:
+@@ -961,4 +980,6 @@ private:
  
              // For dumpsys
              const sp<NBAIO_Sink>                mTeeSink;
