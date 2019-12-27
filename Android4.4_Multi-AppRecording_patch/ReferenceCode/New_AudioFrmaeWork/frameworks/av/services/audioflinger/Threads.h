@@ -33,7 +33,7 @@ public:
     };
 
     ThreadBase(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
-                audio_devices_t outDevice, audio_devices_t inDevice, type_t type);
+                audio_devices_t outDevice, audio_devices_t inDevice, type_t type, bool configLock = true);
     virtual             ~ThreadBase();
 
     void dumpBase(int fd, const Vector<String16>& args);
@@ -327,6 +327,10 @@ protected:
                                         mSuspendedSessions;
                 static const size_t     kLogSize = 4 * 1024;
                 sp<NBLog::Writer>       mNBLogWriter;
+
+				// RecordThread exec processConfigEvents not mutex. from Android5.1.
+				// so for thread safety, add lock config choose.
+				bool                    mConfigLock;
 };
 
 // --- PlaybackThread ---

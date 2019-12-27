@@ -265,7 +265,7 @@ void CpuStats::sample(const String8 &title) {
 // ----------------------------------------------------------------------------
 
 AudioFlinger::ThreadBase::ThreadBase(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
-        audio_devices_t outDevice, audio_devices_t inDevice, type_t type)
+        audio_devices_t outDevice, audio_devices_t inDevice, type_t type, bool configLock)
     :   Thread(false /*canCallJava*/),
         mType(type),
         mAudioFlinger(audioFlinger),
@@ -276,7 +276,8 @@ AudioFlinger::ThreadBase::ThreadBase(const sp<AudioFlinger>& audioFlinger, audio
         mStandby(false), mOutDevice(outDevice), mInDevice(inDevice),
         mAudioSource(AUDIO_SOURCE_DEFAULT), mId(id),
         // mName will be set by concrete (non-virtual) subclass
-        mDeathRecipient(new PMDeathRecipient(this))
+        mDeathRecipient(new PMDeathRecipient(this)),
+        mConfigLock(configLock)
 {
 }
 
@@ -369,14 +370,18 @@ void AudioFlinger::ThreadBase::sendPrioConfigEvent_l(pid_t pid, pid_t tid, int32
 
 void AudioFlinger::ThreadBase::processConfigEvents()
 {
-    //mLock.lock();
-    while (!mConfigEvents.isEmpty()) {
+    if (mConfigLock)
+		mLock.lock();
+
+	while (!mConfigEvents.isEmpty()) {
         ALOGV("processConfigEvents() remaining events %d", mConfigEvents.size());
         ConfigEvent *event = mConfigEvents[0];
         mConfigEvents.removeAt(0);
         // release mLock before locking AudioFlinger mLock: lock order is always
         // AudioFlinger then ThreadBase to avoid cross deadlock
-        //mLock.unlock();
+        if (mConfigLock)
+			mLock.unlock();
+		
         switch(event->type()) {
             case CFG_EVENT_PRIO: {
                 PrioConfigEvent *prioEvent = static_cast<PrioConfigEvent *>(event);
@@ -401,9 +406,13 @@ void AudioFlinger::ThreadBase::processConfigEvents()
         }
 		
         delete event;
-        //mLock.lock();
+		
+        if (mConfigLock)
+			mLock.lock();
     }
-    //mLock.unlock();
+	
+    if (mConfigLock)
+		mLock.unlock();
 }
 
 void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args)
@@ -4378,8 +4387,8 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
                                          , const sp<NBAIO_Sink>& teeSink
 #endif
                                          ) :
-    ThreadBase(audioFlinger, id, outDevice, inDevice, RECORD),
-    mInput(input), mRsmpInBuffer(NULL),
+    ThreadBase(audioFlinger, id, outDevice, inDevice, RECORD, false /* ThreadBase::mConfigLock */),
+    mInput(input), mActiveTracksGen(0), mRsmpInRear(0), mRsmpInBuffer(NULL),
     // mRsmpInIndex and mBufferSize set by readInputParameters()
     mReqChannelCount(popcount(channelMask)),
     mReqSampleRate(sampleRate)
@@ -4390,9 +4399,6 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
 #endif
     , mFastTrackAvail(false)
 {
-	mActiveTracksGen = 0;
-	mRsmpInRear = 0;
-	
     snprintf(mName, kNameLength, "AudioIn_%X", id);
     readInputParameters();
 }
